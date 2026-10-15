@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --bg: #111111;
+  --card: #1a1a1a;
+  --plate: #f5c518;
+  --ink: #f5f5f5;
+  --muted: #a1a1aa;
+  font-family: Barlow, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+.control {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: #0a0a0a;
+  color: white;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+}
+
+.control:focus {
+  outline: 2px solid var(--plate);
+  outline-offset: 1px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 1rem;
+  background: var(--plate);
+  color: #111111;
+  font-family: "Barlow Condensed", Impact, sans-serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--plate);
+  border: 1px solid var(--plate);
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  padding: 1.25rem;
+}
+
+.table-wrap {
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.92rem;
+}
+
+table.data th {
+  position: sticky;
+  top: 0;
+  background: #181818;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.7rem 0.75rem;
+}
+
+table.data td {
+  padding: 0.65rem 0.75rem;
+  border-top: 1px solid rgb(255 255 255 / 0.06);
+  white-space: nowrap;
+}
+
+table.data tbody tr:nth-child(even) {
+  background: rgb(255 255 255 / 0.03);
+}
+
+table.data tbody tr:hover {
+  background: rgb(245 197 24 / 0.08);
+}

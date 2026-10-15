@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-label="Motocross racer">
+  <title>Motocross racer</title>
+  <circle cx="190" cy="360" r="78" fill="none" stroke="#f5c518" stroke-width="22"/>
+  <circle cx="190" cy="360" r="16" fill="#f5c518"/>
+  <circle cx="600" cy="360" r="78" fill="none" stroke="#f5c518" stroke-width="22"/>
+  <circle cx="600" cy="360" r="16" fill="#f5c518"/>
+  <path d="M190 360 L360 300 L500 248" stroke="#f5c518" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M360 300 L450 188 L530 248 L500 248" stroke="#ffffff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M530 248 L600 360" stroke="#f5c518" stroke-width="16" stroke-linecap="round"/>
+  <path d="M430 210 L560 230" stroke="#f5c518" stroke-width="10" stroke-linecap="round"/>
+  <rect x="548" y="188" width="62" height="46" rx="4" fill="#f5c518"/>
+  <text x="579" y="222" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="32" fill="#111111">1</text>
+  <circle cx="392" cy="132" r="38" fill="#f5c518"/>
+  <path d="M364 128 h48" stroke="#111111" stroke-width="8" stroke-linecap="round"/>
+  <path d="M392 170 L430 230 L520 214" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M408 196 L350 270 L300 292" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>
+  <path d="M424 228 L390 300 L340 348" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
+  <path d="M300 292 L250 330" stroke="#ffffff" stroke-width="14" stroke-linecap="round"/>
+</svg>
