@@ -29,6 +29,27 @@ export function formatRaceTime(value: string | null | undefined): string {
   return `${hours}:${minutes}:${seconds}.${hundredths}`
 }
 
+/** Postgres `time` truncated to whole seconds as HH:MM:SS. */
+export function formatElapsedRaceTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const match = /^(\d+):(\d{2}):(\d{2})/.exec(value.trim())
+  if (!match) return value
+  return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}:${match[3]}`
+}
+
+/** Postgres `time` as seconds, for comparisons and the progress chart. */
+export function raceTimeSeconds(value: string | null | undefined): number | null {
+  if (!value) return null
+  const match = /^(\d+):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(value.trim())
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  const seconds = Number(match[3])
+  const fraction = match[4] ? Number(`0.${match[4]}`) : 0
+  if (![hours, minutes, seconds, fraction].every(Number.isFinite)) return null
+  return hours * 3600 + minutes * 60 + seconds + fraction
+}
+
 export function riderName(first: string, last: string): string {
   return `${first} ${last}`.trim()
 }

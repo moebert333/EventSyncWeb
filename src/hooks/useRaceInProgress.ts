@@ -2,14 +2,24 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { ActiveRaceTiming, RaceClassName, RaceInProgress, RaceStatus } from '../types/database'
 
+/** Statuses that still poll for live updates. */
 const LIVE: RaceStatus[] = ['Staging', 'Active', 'Paused']
+/**
+ * Statuses shown by `race_in_progress` (active race + these statuses).
+ * Finished stays visible so final `active_race_timing` can still be shown.
+ */
+const SHOWN: RaceStatus[] = ['Staging', 'Active', 'Paused', 'Finished']
 const RACE_COLUMNS =
-  'race_num, race_id, event_id, series_id, event_name, session_name, race_date, race_start, description, status'
+  'race_num, race_id, event_id, series_id, event_name, session_name, race_date, race_start, description, elapsed_race_time, status'
 const TIMING_COLUMNS =
   'event_id, event_name, race_id, race_num, session_name, class_id, class_name, place_num, current_lap_num, status, participant_id, participant_plate, first_name, last_name, current_lap_time, best_lap_num, best_lap_time, race_elapsed_time, leader_gap_time, next_gap_time'
 
 function isLive(status: RaceStatus | null | undefined): boolean {
   return status != null && LIVE.includes(status)
+}
+
+function isShown(status: RaceStatus | null | undefined): boolean {
+  return status != null && SHOWN.includes(status)
 }
 
 export function useRaceInProgress(eventId: number | null, seriesId: number | null) {
@@ -34,7 +44,8 @@ export function useRaceInProgress(eventId: number | null, seriesId: number | nul
       if (bySeries.error) throw bySeries.error
       return (bySeries.data?.[0] ?? null) as RaceInProgress | null
     },
-    refetchInterval: (query) => (isLive(query.state.data?.status) ? 2500 : false),
+    // Keep polling through Finished so the next Staging/Active race can replace it.
+    refetchInterval: (query) => (isShown(query.state.data?.status) ? 2500 : false),
   })
 }
 
@@ -42,7 +53,8 @@ export function useLiveTiming(race: RaceInProgress | null | undefined) {
   const live = isLive(race?.status)
   return useQuery({
     queryKey: ['active-race-timing', race?.race_id],
-    enabled: race != null && live,
+    // Fetch whenever the race is shown, including Finished (timing rows remain).
+    enabled: race != null,
     queryFn: async (): Promise<ActiveRaceTiming[]> => {
       const { data, error } = await supabase
         .from('active_race_timing')

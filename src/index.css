@@ -122,3 +122,36 @@ table.data tbody tr:nth-child(even) {
 table.data tbody tr:hover {
   background: rgb(245 197 24 / 0.08);
 }
+
+table.data tbody tr.is-selectable {
+  cursor: pointer;
+}
+
+table.data tbody tr.is-selectable:focus-visible {
+  outline: 2px solid var(--plate);
+  outline-offset: -2px;
+}
+
+table.data tbody tr.is-selected td {
+  background: #d4d4d4;
+  color: #161616;
+}
+
+table.data tbody tr.is-leader td {
+  background: #c9efd4;
+  color: #102416;
+}
+
+table.data tbody tr.is-selected.is-leader td {
+  background: #c9efd4;
+  box-shadow: inset 4px 0 0 #3f3f46;
+}
+
+table.data tbody tr.is-selected:hover td {
+  background: #c4c4c4;
+}
+
+table.data tbody tr.is-leader:hover td,
+table.data tbody tr.is-selected.is-leader:hover td {
+  background: #b7e6c4;
+}

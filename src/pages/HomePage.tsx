@@ -60,8 +60,8 @@ export function HomePage() {
     <div className="space-y-10">
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
         <section>
-          <img src="/rider.svg" alt="Motocross racer" className="mb-4 h-36 w-auto" />
-          <h1 className="font-display text-5xl font-extrabold uppercase leading-none tracking-tight sm:text-7xl">
+          <img src="/rider.svg" alt="Motocross racer" className="mb-4 h-[6.75rem] w-auto" />
+          <h1 className="font-display text-4xl font-extrabold uppercase leading-none tracking-tight sm:text-[3.375rem]">
             Live laps. Staging. Results. Don’t miss your moto.
           </h1>
           <p className="mt-4 max-w-xl text-lg text-zinc-300">
@@ -110,7 +110,11 @@ export function HomePage() {
           </form>
 
           {context ? (
-            <div className="mt-6 inline-flex max-w-lg flex-col gap-1 border border-[#f5c518] px-4 py-3">
+            <Link
+              to="/live"
+              className="mt-6 inline-flex max-w-lg cursor-pointer flex-col gap-1 border border-[#f5c518] px-4 py-3 no-underline"
+              aria-label={`Open races in progress for ${context.eventName}`}
+            >
               <span className="font-display text-2xl font-bold uppercase">{context.organizationName}</span>
               <span className="text-lg">{context.eventName}</span>
               {dateLabel || place ? (
@@ -119,7 +123,7 @@ export function HomePage() {
                 </span>
               ) : null}
               <span className="text-xs uppercase tracking-widest text-zinc-500">{context.code}</span>
-            </div>
+            </Link>
           ) : null}
 
           {showIosHint ? (
@@ -163,13 +167,13 @@ export function HomePage() {
       </div>
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <Link to="/live" className="panel font-display text-2xl font-bold uppercase">
+        <Link to="/live" className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline">
           Races in progress
         </Link>
-        <Link to="/results" className="panel font-display text-2xl font-bold uppercase">
+        <Link to="/results" className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline">
           Completed races
         </Link>
-        <Link to="/stream" className="panel font-display text-2xl font-bold uppercase">
+        <Link to="/stream" className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline">
           Live stream
         </Link>
       </section>

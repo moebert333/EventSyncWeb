@@ -54,6 +54,7 @@ Required files in `public/`:
 - **App shell** (JS/CSS/HTML/icons): precache. Offline can open Home chrome.
 - **Supabase API / live timing:** network-only. Do not serve stale lap times as if live.
 - **News images:** cache-first is acceptable.
+- **Status videos** (`public/videos/*.mp4`): do not precache. Serve over the network when the Races In Progress page needs them.
 
 Do not claim “offline racing.” Banner when `navigator.onLine === false`.
 
@@ -79,6 +80,10 @@ Save resolved context in `localStorage` key `eventsync.eventContext`:
 ```
 
 Restore on PWA launch so the rider does not re-enter the code every session. Provide “Change event” on Home.
+
+## Lap progress (client only)
+
+`localStorage` key `eventsync.lapProgress` stores, for the shown race and each participant, the latest current-lap time and place observed for each lap. This history feeds the progress chart on Races In Progress. Clear it when a different race is shown, and when place numbers are all `0` (race restart). It is not live timing, and the service worker must not treat it as a network response. Do not write it back to Supabase.
 
 ## HTTPS and deploy
 

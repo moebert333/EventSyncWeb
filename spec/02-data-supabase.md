@@ -60,7 +60,7 @@ Function `place_label(pos int)`: `NULL` → null; `> 80` → `DNS/DNF`; else pos
 | `event_class_results` | Completed Races grid |
 | `race_class_names` | Classes under a race; Race order page later |
 
-`race_in_progress` already joins `races` + `events` + `status` where status ∈ (`Staging`, `Active`, `Paused`).
+`race_in_progress` already joins `races` + `events` + `status` where `races.active` is true and status ∈ (`Staging`, `Active`, `Paused`, `Finished`). Finished stays in the view so the live page can keep showing that race and its `active_race_timing` rows until the race is no longer active.
 
 ## Schema additions required for this website
 
@@ -206,6 +206,12 @@ select * from public.active_race_timing
 where race_id = $race_id
 order by class_name, place_num;
 ```
+
+The Races In Progress page shows one class at a time. It does not read `race_timing` for the progress chart.
+
+### Client lap progress
+
+The website does not insert timing rows. As `active_race_timing` polls arrive, the page stores the latest current lap time and place for each participant and lap in `localStorage` key `eventsync.lapProgress`, for the shown `race_id` only. That cache only feeds the progress chart and must not be written back to Supabase. Clear it when the shown race changes, and when a poll reports place `0` for every placed row (the race is restarting). Do not record the restart poll. Refresh on the same race keeps the chart.
 
 ### Completed results
 

@@ -18,7 +18,7 @@ EventSync is a public website and installable PWA for racers and spectators at a
 ## User jobs (MVP)
 
 1. Scan a QR or type a 6–12 character Event Code and land on that organization + event.
-2. See that a race is staging / in progress / paused, with class lists and live participant timing.
+2. See that a race is staging / in progress / paused, choose one class, and follow live participant timing plus a place and lap-time progress chart.
 3. Browse completed event results, filter by series → event → class or participant.
 4. Install the site on a phone home screen and reopen it without signing in (public pages).
 5. An allowlisted organizer signs in with a magic link and creates/edits organization, series, events, and Event Codes.

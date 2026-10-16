@@ -52,6 +52,7 @@ export type RaceInProgress = {
   race_date: string | null
   race_start: string | null
   description: string | null
+  elapsed_race_time: string | null
   status: RaceStatus | null
 }
 
