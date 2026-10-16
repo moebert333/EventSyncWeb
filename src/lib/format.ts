@@ -29,12 +29,21 @@ export function formatRaceTime(value: string | null | undefined): string {
   return `${hours}:${minutes}:${seconds}.${hundredths}`
 }
 
+/** Whole seconds as HH:MM:SS. */
+export function formatElapsedSeconds(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds))
+  const hours = Math.floor(safe / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  const seconds = safe % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
 /** Postgres `time` truncated to whole seconds as HH:MM:SS. */
 export function formatElapsedRaceTime(value: string | null | undefined): string {
   if (!value) return '—'
-  const match = /^(\d+):(\d{2}):(\d{2})/.exec(value.trim())
-  if (!match) return value
-  return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}:${match[3]}`
+  const seconds = raceTimeSeconds(value)
+  if (seconds == null) return value
+  return formatElapsedSeconds(seconds)
 }
 
 /** Postgres `time` as seconds, for comparisons and the progress chart. */

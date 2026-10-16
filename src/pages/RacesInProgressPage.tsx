@@ -6,10 +6,10 @@ import { Skeleton } from '../components/Skeleton'
 import { StatusPill } from '../components/StatusPill'
 import { useEventCode } from '../hooks/useEventCode'
 import { useLiveTiming, useRaceClassNames, useRaceInProgress } from '../hooks/useRaceInProgress'
+import { useElapsedRaceClock } from '../hooks/useElapsedRaceClock'
 import {
   bestLapLabel,
   formatClock,
-  formatElapsedRaceTime,
   formatEventDate,
   formatRaceTime,
   placeRank,
@@ -77,6 +77,10 @@ export function RacesInProgressPage() {
   const live = raceQuery.data?.status != null && LIVE.includes(raceQuery.data.status)
   const timingQuery = useLiveTiming(raceQuery.data)
   const classQuery = useRaceClassNames(raceQuery.data?.race_id ?? null, live)
+  const elapsedDisplay = useElapsedRaceClock(
+    raceQuery.data?.elapsed_race_time,
+    raceQuery.data?.status === 'Active',
+  )
   const raceId = raceQuery.data?.race_id ?? null
   const timingRows = timingQuery.data ?? []
   const groups = groupByClass(timingRows)
@@ -246,7 +250,7 @@ export function RacesInProgressPage() {
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="font-display text-2xl font-bold uppercase">{activeClass}</h2>
             <p className="text-lg font-semibold tabular-nums">
-              Elapsed Time: {formatElapsedRaceTime(race.elapsed_race_time)}
+              Elapsed Time: {elapsedDisplay}
             </p>
             <span className="ml-auto inline-flex min-h-8 items-center bg-[#c9efd4] px-3 text-sm font-bold text-black">
               Best Lap Time

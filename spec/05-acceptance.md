@@ -67,7 +67,7 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] One live race: header prefixed “Event Name:” (larger, bold), race number, session, status, and class list
 - [ ] Class chips are buttons. One class is selected (accent background). Only that class table is shown. First class is selected on load.
 - [ ] One row per participant in the selected class. No Class column.
-- [ ] Class name line shows “Elapsed Time:” with race elapsed time to the second, then a light-green “Best Lap Time” label with black text, just above the table
+- [ ] Class name line shows “Elapsed Time:” with race elapsed time to the second (local 1s tick while Active between polls), then a light-green “Best Lap Time” label with black text, just above the table
 - [ ] Clicking a row selects it with a light grey shade
 - [ ] Double-clicking a row toggles the progress chart
 - [ ] Once any visible row has lap ≥ 1, the row on the greatest lap with the lowest current lap time is shaded light green
