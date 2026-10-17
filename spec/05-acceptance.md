@@ -65,21 +65,22 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] Uses `race_in_progress` + `active_race_timing` (+ class names view)
 - [ ] Zero rows → empty state, not a crash
 - [ ] One live race: header prefixed “Event Name:” (larger, bold), race number, session, status, and class list
-- [ ] Class chips are buttons. One class is selected (accent background). Only that class table is shown. First class is selected on load.
-- [ ] One row per participant in the selected class. No Class column.
+- [ ] Class chips are buttons. One class is selected (accent background), or All Classes to the right of the chips. Only that class table is shown unless All Classes is selected. First class is selected on load.
+- [ ] One row per participant in the selected class. No Class column. A single class starts sorted by place. All Classes lists every class, adds a Class column, and defaults to Class then Place. Clicking any column header sorts that table; clicking it again reverses the order. Best lap shows as `#n - time`.
 - [ ] Class name line shows “Elapsed Time:” with race elapsed time to the second (local 1s tick while Active between polls), then a light-green “Best Lap Time” label with black text, just above the table
 - [ ] Clicking a row selects it with a light grey shade
-- [ ] Double-clicking a row toggles the progress chart
+- [ ] Clicking a row selects it and opens the progress chart, with the chart button selected and the video closed
 - [ ] Once any visible row has lap ≥ 1, the row on the greatest lap with the lowest current lap time is shaded light green
-- [ ] Each poll stores current lap time and place per participant and lap in `localStorage` (`eventsync.lapProgress`). Nothing is written to Supabase.
+- [ ] The current-lap column is labeled Lap Time
+- [ ] Each poll stores place, lap time, best lap time, gap to leader, and gap to next per participant and lap in `localStorage` (`eventsync.lapProgress`). Nothing is written to Supabase.
 - [ ] Saved chart data is cleared when a different race is shown
 - [ ] Saved chart data is cleared when every reported place is 0 (race restart), and that poll is not recorded
 - [ ] Chart icon sits to the right of the status pill and toggles a line chart just above the class chips
-- [ ] Video icon sits beside the chart icon (when a status video exists) and toggles a muted looping status video in the same slot: Staging → `start_race.mp4`, Active → `active_race.mp4`, Finished → `finish_race.mp4`
-- [ ] Selecting chart or video opens that panel and unselects the other; unselecting either leaves the other unchanged. Row double-click show/hide follows the same chart rules
-- [ ] On page open or when a new race is shown, the status video starts open if that status has a video; chart starts closed
-- [ ] Chart uses the selected row, or the first row if none is selected. X = lap, left Y = place, right Y = lap time
-- [ ] Fewer than 2 stored laps shows “Waiting for 2 Laps data”
+- [ ] Video icon sits beside the chart icon (when status media exists) and toggles that slot: Staging → `start_race.mp4`, Active → `active_race.mp4`, Paused → `pause_race.jpg` only while the video button is selected, Finished → `finish_race.mp4`
+- [ ] Selecting chart or video opens that panel and unselects the other; unselecting either leaves the other unchanged. A table-row click opens the chart and unselects the video
+- [ ] Selecting the page leaves the status video closed. When a new race starts while the page is open, the video starts open if that status has a video. Chart starts closed
+- [ ] Chart uses the selected row, or the first row if none is selected. X = lap. Left and right Y default to Place and Lap Time, or the axes last saved in this browser (`eventsync.chartAxes`). Clicking the legend shows Left axis and Right axis dropdowns (Place, Lap Time, Best Lap, Gap to Leader, Gap to Next) and a Save button. Save stores the choice and returns to the legend. A click outside the legend cancels and keeps the previous legend
+- [ ] Fewer than 2 stored laps shows “Chart is Waiting for 2 Laps Data...”
 - [ ] Finished races from `race_in_progress` still show the header and `active_race_timing` table
 - [ ] Timing polls only while status is Staging / Active / Paused; Finished still loads timing once
 - [ ] Scoped to Event Code’s event (or series fallback as in data spec)

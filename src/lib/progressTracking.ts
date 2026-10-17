@@ -6,6 +6,9 @@ export type LapProgressPoint = {
   lap: number
   lapTime: string | null
   place: string | null
+  bestLapTime: string | null
+  leaderGap: string | null
+  nextGap: string | null
 }
 
 export type RaceLapProgress = Record<string, LapProgressPoint[]>
@@ -57,16 +60,23 @@ function sanitizeRace(race: unknown): RaceLapProgress {
   return result
 }
 
+function timeText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
 function sanitizePoint(point: unknown): LapProgressPoint | null {
   if (!point || typeof point !== 'object') return null
-  const lap = Number((point as LapProgressPoint).lap)
+  const raw = point as Partial<LapProgressPoint>
+  const lap = Number(raw.lap)
   if (!Number.isInteger(lap) || lap < 1) return null
-  const lapTime = (point as LapProgressPoint).lapTime
-  const place = (point as LapProgressPoint).place
+  const place = raw.place
   return {
     lap,
-    lapTime: typeof lapTime === 'string' && lapTime.trim() ? lapTime : null,
+    lapTime: timeText(raw.lapTime),
     place: place == null || place === '' ? null : String(place),
+    bestLapTime: timeText(raw.bestLapTime),
+    leaderGap: timeText(raw.leaderGap),
+    nextGap: timeText(raw.nextGap),
   }
 }
 
@@ -147,9 +157,24 @@ export function isRaceRestart(rows: ActiveRaceTiming[]): boolean {
   return sawPlace
 }
 
+function keepTime(incoming: string | null | undefined, previous: string | null | undefined): string | null {
+  if (incoming == null || incoming.trim() === '') return previous ?? null
+  return incoming
+}
+
+function sameSample(previous: LapProgressPoint, sample: LapProgressPoint): boolean {
+  return (
+    previous.lapTime === sample.lapTime &&
+    previous.place === sample.place &&
+    previous.bestLapTime === sample.bestLapTime &&
+    previous.leaderGap === sample.leaderGap &&
+    previous.nextGap === sample.nextGap
+  )
+}
+
 /**
  * Merge the latest timing poll into the local lap history.
- * Each participant keeps one sample per lap: current lap time and place.
+ * Each participant keeps one sample per lap: place, lap time, best lap time, and both gaps.
  * A later poll for the same lap replaces that sample.
  * History is cleared when a different race is shown, and when places are all 0 (restart).
  */
@@ -179,11 +204,16 @@ export function recordLapProgress(raceId: number, rows: ActiveRaceTiming[]): Rac
     const points = draft[key] ?? []
     const index = points.findIndex((point) => point.lap === lap)
     const previous = index >= 0 ? points[index] : null
-    const lapTime = row.current_lap_time ?? previous?.lapTime ?? null
-    const place = placeText(row.place_num) ?? previous?.place ?? null
-    if (previous && previous.lapTime === lapTime && previous.place === place) continue
+    const sample: LapProgressPoint = {
+      lap,
+      lapTime: keepTime(row.current_lap_time, previous?.lapTime),
+      place: placeText(row.place_num) ?? previous?.place ?? null,
+      bestLapTime: keepTime(row.best_lap_time, previous?.bestLapTime),
+      leaderGap: keepTime(row.leader_gap_time, previous?.leaderGap),
+      nextGap: keepTime(row.next_gap_time, previous?.nextGap),
+    }
+    if (previous && sameSample(previous, sample)) continue
     const nextPoints = points.slice()
-    const sample: LapProgressPoint = { lap, lapTime, place }
     if (index >= 0) nextPoints[index] = sample
     else nextPoints.push(sample)
     nextPoints.sort((a, b) => a.lap - b.lap)

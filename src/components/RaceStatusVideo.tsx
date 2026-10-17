@@ -3,6 +3,7 @@ import type { RaceStatus } from '../types/database'
 const VIDEOS: Partial<Record<RaceStatus, string>> = {
   Staging: '/videos/start_race.mp4',
   Active: '/videos/active_race.mp4',
+  Paused: '/videos/pause_race.jpg',
   Finished: '/videos/finish_race.mp4',
 }
 
@@ -25,22 +26,30 @@ export function VideoIcon() {
   )
 }
 
+function isImage(src: string): boolean {
+  return /\.(avif|gif|jpe?g|png|webp)$/i.test(src)
+}
+
 export function RaceStatusVideo({ status, showVideo }: Props) {
   const src = raceStatusVideoSrc(status)
   if (!src || !showVideo) return null
 
   return (
     <div id="race-status-video" className="mt-4 overflow-hidden border border-white/15 bg-black">
-      <video
-        key={src}
-        className="block max-h-64 w-full object-contain"
-        src={src}
-        autoPlay
-        loop
-        muted
-        playsInline
-        aria-label="Race status video"
-      />
+      {isImage(src) ? (
+        <img src={src} alt="Race paused" className="block max-h-64 w-full object-contain" />
+      ) : (
+        <video
+          key={src}
+          className="block max-h-64 w-full object-contain"
+          src={src}
+          autoPlay
+          loop
+          muted
+          playsInline
+          aria-label="Race status video"
+        />
+      )}
     </div>
   )
 }

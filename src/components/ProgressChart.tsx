@@ -1,15 +1,58 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { raceTimeSeconds } from '../lib/format'
 import type { LapProgressPoint } from '../lib/progressTracking'
 
-const PLACE_COLOR = '#f5c518'
-const TIME_COLOR = '#38bdf8'
+const LEFT_COLOR = '#f5c518'
+const RIGHT_COLOR = '#38bdf8'
 const HEIGHT = 224
+
+const CHART_METRICS = [
+  { id: 'place', label: 'Place', kind: 'rank' },
+  { id: 'lapTime', label: 'Lap Time', kind: 'time' },
+  { id: 'bestLap', label: 'Best Lap', kind: 'time' },
+  { id: 'leaderGap', label: 'Gap to Leader', kind: 'time' },
+  { id: 'nextGap', label: 'Gap to Next', kind: 'time' },
+] as const
+
+type MetricId = (typeof CHART_METRICS)[number]['id']
+type MetricKind = (typeof CHART_METRICS)[number]['kind']
+type AxisSide = 'left' | 'right'
+
+const AXES_KEY = 'eventsync.chartAxes'
+const DEFAULT_AXES = { left: 'place', right: 'lapTime' } as const
+
+function isMetricId(value: unknown): value is MetricId {
+  return CHART_METRICS.some((metric) => metric.id === value)
+}
+
+function loadChartAxes(): { left: MetricId; right: MetricId } {
+  try {
+    const raw = localStorage.getItem(AXES_KEY)
+    if (!raw) return { ...DEFAULT_AXES }
+    const parsed = JSON.parse(raw) as { left?: unknown; right?: unknown }
+    return {
+      left: isMetricId(parsed.left) ? parsed.left : DEFAULT_AXES.left,
+      right: isMetricId(parsed.right) ? parsed.right : DEFAULT_AXES.right,
+    }
+  } catch {
+    return { ...DEFAULT_AXES }
+  }
+}
+
+function persistChartAxes(left: MetricId, right: MetricId) {
+  try {
+    localStorage.setItem(AXES_KEY, JSON.stringify({ left, right }))
+  } catch {
+    // Storage can be full or blocked. The in-memory choice still drives this visit.
+  }
+}
+
+type Metric = (typeof CHART_METRICS)[number]
 
 type PlotPoint = {
   lap: number
-  place: number | null
-  seconds: number | null
+  left: number | null
+  right: number | null
 }
 
 type Props = {
@@ -27,17 +70,36 @@ export function ChartIcon() {
   )
 }
 
+function metricById(id: MetricId): Metric {
+  return CHART_METRICS.find((metric) => metric.id === id) ?? CHART_METRICS[0]
+}
+
 function numericPlace(place: string | null): number | null {
   if (place == null || place.trim() === '') return null
   const value = Number(place)
   return Number.isFinite(value) ? value : null
 }
 
-function toPlotPoints(points: LapProgressPoint[]): PlotPoint[] {
+function metricValue(point: LapProgressPoint, id: MetricId): number | null {
+  switch (id) {
+    case 'place':
+      return numericPlace(point.place)
+    case 'lapTime':
+      return raceTimeSeconds(point.lapTime)
+    case 'bestLap':
+      return raceTimeSeconds(point.bestLapTime)
+    case 'leaderGap':
+      return raceTimeSeconds(point.leaderGap)
+    case 'nextGap':
+      return raceTimeSeconds(point.nextGap)
+  }
+}
+
+function toPlotPoints(points: LapProgressPoint[], left: MetricId, right: MetricId): PlotPoint[] {
   return points.map((point) => ({
     lap: point.lap,
-    place: numericPlace(point.place),
-    seconds: raceTimeSeconds(point.lapTime),
+    left: metricValue(point, left),
+    right: metricValue(point, right),
   }))
 }
 
@@ -48,6 +110,10 @@ function formatAxisTime(seconds: number): string {
   const remain = total - minutes * 60
   const text = `${minutes}:${remain.toFixed(2).padStart(5, '0')}`
   return negative ? `-${text}` : text
+}
+
+function formatMetric(value: number, kind: MetricKind): string {
+  return kind === 'time' ? formatAxisTime(value) : String(value)
 }
 
 function yAt(value: number, min: number, max: number, top: number, bottom: number, minAtTop: boolean): number {
@@ -88,12 +154,87 @@ function integerTicks(min: number, max: number): number[] {
   return ticks
 }
 
+function AxisSelect({
+  side,
+  color,
+  value,
+  onChange,
+}: {
+  side: AxisSide
+  color: string
+  value: MetricId
+  onChange: (id: MetricId) => void
+}) {
+  const label = side === 'left' ? 'Left axis' : 'Right axis'
+  return (
+    <label className="inline-flex items-center gap-2">
+      <span className="inline-block h-0.5 w-6" style={{ background: color }} />
+      <span>{label}</span>
+      <select
+        className="min-h-11 cursor-pointer border border-zinc-500 bg-zinc-200 px-2 text-sm font-semibold text-black"
+        style={{ colorScheme: 'light' }}
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(event.target.value as MetricId)}
+      >
+        {CHART_METRICS.map((metric) => (
+          <option key={metric.id} value={metric.id}>
+            {metric.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 export function ProgressTrackingChart({ riderLabel, points }: Props) {
   const labelId = useId()
+  const legendRef = useRef<HTMLDivElement>(null)
+  const ignoreOutsideRef = useRef(false)
+  const [axesOpen, setAxesOpen] = useState(false)
+  const [savedLeft, setSavedLeft] = useState<MetricId>(() => loadChartAxes().left)
+  const [savedRight, setSavedRight] = useState<MetricId>(() => loadChartAxes().right)
+  const [draftLeft, setDraftLeft] = useState<MetricId>(savedLeft)
+  const [draftRight, setDraftRight] = useState<MetricId>(savedRight)
+  const left = metricById(savedLeft)
+  const right = metricById(savedRight)
   const ready = points.length >= 2
   const described = riderLabel
-    ? `${riderLabel}. Place and lap time by lap.`
-    : 'Place and lap time by lap.'
+    ? `${riderLabel}. ${left.label} and ${right.label} by lap.`
+    : `${left.label} and ${right.label} by lap.`
+
+  useEffect(() => {
+    if (!axesOpen) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (ignoreOutsideRef.current) return
+      const root = legendRef.current
+      const target = event.target
+      if (root && target instanceof Node && root.contains(target)) return
+      setAxesOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [axesOpen])
+
+  const openAxes = () => {
+    setDraftLeft(savedLeft)
+    setDraftRight(savedRight)
+    setAxesOpen(true)
+  }
+
+  const keepEditorForSelect = () => {
+    ignoreOutsideRef.current = true
+    window.setTimeout(() => {
+      ignoreOutsideRef.current = false
+    }, 400)
+  }
+
+  const saveAxes = () => {
+    setSavedLeft(draftLeft)
+    setSavedRight(draftRight)
+    persistChartAxes(draftLeft, draftRight)
+    setAxesOpen(false)
+  }
 
   return (
     <div className="border border-white/15 bg-[#141414] px-3 py-3" aria-labelledby={labelId}>
@@ -106,23 +247,55 @@ export function ProgressTrackingChart({ riderLabel, points }: Props) {
           Progress tracking
         </p>
       )}
+      <div ref={legendRef} className="mt-2 flex flex-wrap items-center gap-4 text-sm text-zinc-300">
+        {axesOpen ? (
+          <>
+            <AxisSelect
+              side="left"
+              color={LEFT_COLOR}
+              value={draftLeft}
+              onChange={(id) => {
+                keepEditorForSelect()
+                setDraftLeft(id)
+              }}
+            />
+            <AxisSelect
+              side="right"
+              color={RIGHT_COLOR}
+              value={draftRight}
+              onChange={(id) => {
+                keepEditorForSelect()
+                setDraftRight(id)
+              }}
+            />
+            <button type="button" className="btn min-h-11 px-4 text-base" onClick={saveAxes}>
+              Save
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="inline-flex cursor-pointer flex-wrap items-center gap-4"
+            aria-expanded={false}
+            aria-label="Choose chart axes"
+            onClick={openAxes}
+          >
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block h-0.5 w-6" style={{ background: LEFT_COLOR }} />
+              {left.label}
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block h-0.5 w-6" style={{ background: RIGHT_COLOR }} />
+              {right.label}
+            </span>
+          </button>
+        )}
+      </div>
       {ready ? (
-        <>
-          <div className="mt-2 flex flex-wrap gap-4 text-sm text-zinc-300">
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-block h-0.5 w-6" style={{ background: PLACE_COLOR }} />
-              Place
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-block h-0.5 w-6" style={{ background: TIME_COLOR }} />
-              Lap time
-            </span>
-          </div>
-          <ProgressPlot points={toPlotPoints(points)} label={described} />
-        </>
+        <ProgressPlot points={toPlotPoints(points, savedLeft, savedRight)} label={described} left={left} right={right} />
       ) : (
         <p className="flex min-h-36 items-center justify-center text-center text-lg text-zinc-200">
-          Waiting for 2 Laps data
+          Chart is Waiting for 2 Laps Data...
         </p>
       )}
     </div>
@@ -131,11 +304,11 @@ export function ProgressTrackingChart({ riderLabel, points }: Props) {
 
 type HoverTip = {
   lap: number
-  series: 'place' | 'time'
+  series: AxisSide
   x: number
   y: number
-  place: number | null
-  seconds: number | null
+  text: string
+  color: string
 }
 
 const HOVER_HIT_PX = 14
@@ -148,7 +321,76 @@ function distToSegment(px: number, py: number, x1: number, y1: number, x2: numbe
   return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))
 }
 
-function ProgressPlot({ points, label }: { points: PlotPoint[]; label: string }) {
+type AxisScale = {
+  side: AxisSide
+  metric: Metric
+  color: string
+  tickColor: string
+  minAtTop: boolean
+  domainMin: number
+  domainMax: number
+  ticks: number[]
+  read: (point: PlotPoint) => number | null
+}
+
+function axisScale(side: AxisSide, metric: Metric, values: number[]): AxisScale {
+  const rank = metric.kind === 'rank'
+  const color = side === 'left' ? LEFT_COLOR : RIGHT_COLOR
+  if (values.length === 0) {
+    return {
+      side,
+      metric,
+      color,
+      tickColor: side === 'left' ? '#a1a1aa' : '#7dd3fc',
+      minAtTop: rank,
+      domainMin: rank ? 0.4 : 0,
+      domainMax: rank ? 1.6 : 1,
+      ticks: rank ? [1] : [0, 1],
+      read: (point) => (side === 'left' ? point.left : point.right),
+    }
+  }
+  const dataMin = Math.min(...values)
+  const dataMax = Math.max(...values)
+  if (rank) {
+    return {
+      side,
+      metric,
+      color,
+      tickColor: '#a1a1aa',
+      minAtTop: true,
+      domainMin: dataMin - 0.6,
+      domainMax: dataMax + 0.6,
+      ticks: integerTicks(dataMin, dataMax),
+      read: (point) => (side === 'left' ? point.left : point.right),
+    }
+  }
+  const span = dataMax - dataMin || Math.max(Math.abs(dataMax) * 0.05, 0.5)
+  const domainMin = dataMin - span * 0.12
+  const domainMax = dataMax + span * 0.12
+  return {
+    side,
+    metric,
+    color,
+    tickColor: side === 'left' ? '#a1a1aa' : '#7dd3fc',
+    minAtTop: false,
+    domainMin,
+    domainMax,
+    ticks: [0, 1, 2, 3].map((step) => domainMin + ((domainMax - domainMin) * step) / 3),
+    read: (point) => (side === 'left' ? point.left : point.right),
+  }
+}
+
+function ProgressPlot({
+  points,
+  label,
+  left,
+  right,
+}: {
+  points: PlotPoint[]
+  label: string
+  left: Metric
+  right: Metric
+}) {
   const [width, setWidth] = useState(0)
   const [element, setElement] = useState<HTMLDivElement | null>(null)
   const [hover, setHover] = useState<HoverTip | null>(null)
@@ -162,7 +404,16 @@ function ProgressPlot({ points, label }: { points: PlotPoint[]; label: string })
     return () => observer.disconnect()
   }, [element])
 
-  const pad = { left: 56, right: 88, top: 28, bottom: 36 }
+  const leftValues = points.flatMap((point) => (point.left == null ? [] : [point.left]))
+  const rightValues = points.flatMap((point) => (point.right == null ? [] : [point.right]))
+  const leftScale = axisScale('left', left, leftValues)
+  const rightScale = axisScale('right', right, rightValues)
+  const pad = {
+    left: left.kind === 'time' ? 84 : 56,
+    right: right.kind === 'time' ? 88 : 48,
+    top: 28,
+    bottom: 36,
+  }
   const innerW = Math.max(40, width - pad.left - pad.right)
   const innerH = HEIGHT - pad.top - pad.bottom
   const top = pad.top
@@ -178,48 +429,24 @@ function ProgressPlot({ points, label }: { points: PlotPoint[]; label: string })
     return pad.left + inset + (index / xMaxIndex) * (innerW - inset * 2)
   }
 
-  const places = points.flatMap((point) => (point.place == null ? [] : [point.place]))
-  const times = points.flatMap((point) => (point.seconds == null ? [] : [point.seconds]))
-  const placeMin = places.length ? Math.min(...places) : 1
-  const placeMax = places.length ? Math.max(...places) : 1
-  const placeDomainMin = placeMin - 0.6
-  const placeDomainMax = placeMax + 0.6
-  const timeMin = times.length ? Math.min(...times) : 0
-  const timeMax = times.length ? Math.max(...times) : 1
-  const timeSpan = timeMax - timeMin || Math.max(Math.abs(timeMax) * 0.05, 0.5)
-  const timeDomainMin = timeMin - timeSpan * 0.12
-  const timeDomainMax = timeMax + timeSpan * 0.12
-
-  const yPlace = (place: number) => yAt(place, placeDomainMin, placeDomainMax, top, bottom, true)
-  const yTime = (seconds: number) => yAt(seconds, timeDomainMin, timeDomainMax, top, bottom, false)
-  const placePaths = linePath(points, xOf, (point) => (point.place == null ? null : yPlace(point.place)))
-  const timePaths = linePath(points, xOf, (point) => (point.seconds == null ? null : yTime(point.seconds)))
-  const placeTicks = places.length ? integerTicks(placeMin, placeMax) : [1]
-  const timeTicks = [0, 1, 2, 3].map((step) => timeDomainMin + ((timeDomainMax - timeDomainMin) * step) / 3)
+  const yOf = (scale: AxisScale, value: number) =>
+    yAt(value, scale.domainMin, scale.domainMax, top, bottom, scale.minAtTop)
+  const leftPaths = linePath(points, xOf, (point) => (point.left == null ? null : yOf(leftScale, point.left)))
+  const rightPaths = linePath(points, xOf, (point) => (point.right == null ? null : yOf(rightScale, point.right)))
   const lapStep = laps.length > 16 ? Math.ceil(laps.length / 12) : 1
+  const scales = [leftScale, rightScale]
 
-  const tipFor = (point: PlotPoint, series: 'place' | 'time'): HoverTip | null => {
-    if (series === 'place' && point.place != null) {
-      return {
-        lap: point.lap,
-        series,
-        x: xOf(point.lap),
-        y: yPlace(point.place),
-        place: point.place,
-        seconds: point.seconds,
-      }
+  const tipFor = (point: PlotPoint, scale: AxisScale): HoverTip | null => {
+    const value = scale.read(point)
+    if (value == null) return null
+    return {
+      lap: point.lap,
+      series: scale.side,
+      x: xOf(point.lap),
+      y: yOf(scale, value),
+      text: `${scale.metric.label} ${formatMetric(value, scale.metric.kind)}`,
+      color: scale.color,
     }
-    if (series === 'time' && point.seconds != null) {
-      return {
-        lap: point.lap,
-        series,
-        x: xOf(point.lap),
-        y: yTime(point.seconds),
-        place: point.place,
-        seconds: point.seconds,
-      }
-    }
-    return null
   }
 
   const findHover = (clientX: number, clientY: number, svg: SVGSVGElement): HoverTip | null => {
@@ -238,16 +465,16 @@ function ProgressPlot({ points, label }: { points: PlotPoint[]; label: string })
       best = tip
     }
 
-    for (const series of ['place', 'time'] as const) {
-      const seriesPoints = points.filter((point) => (series === 'place' ? point.place != null : point.seconds != null))
+    for (const scale of scales) {
+      const seriesPoints = points.filter((point) => scale.read(point) != null)
       for (let i = 0; i < seriesPoints.length; i++) {
         const point = seriesPoints[i]!
-        const tip = tipFor(point, series)
+        const tip = tipFor(point, scale)
         if (tip == null) continue
         consider(tip, Math.hypot(px - tip.x, py - tip.y))
         const next = seriesPoints[i + 1]
         if (!next) continue
-        const nextTip = tipFor(next, series)
+        const nextTip = tipFor(next, scale)
         if (nextTip == null) continue
         const segDist = distToSegment(px, py, tip.x, tip.y, nextTip.x, nextTip.y)
         if (segDist > bestDist) continue
@@ -259,7 +486,7 @@ function ProgressPlot({ points, label }: { points: PlotPoint[]; label: string })
     return best
   }
 
-  const tipLeft = hover ? Math.min(Math.max(hover.x + 12, 8), Math.max(8, width - 140)) : 0
+  const tipLeft = hover ? Math.min(Math.max(hover.x + 12, 8), Math.max(8, width - 168)) : 0
   const tipTop = hover ? Math.min(Math.max(hover.y - 44, 4), Math.max(4, HEIGHT - 56)) : 0
 
   return (
@@ -276,26 +503,32 @@ function ProgressPlot({ points, label }: { points: PlotPoint[]; label: string })
             onPointerMove={(event) => setHover(findHover(event.clientX, event.clientY, event.currentTarget))}
             onPointerLeave={() => setHover(null)}
           >
-            <text x={pad.left} y={16} fill={PLACE_COLOR} fontSize="12" textAnchor="start">
-              Place
+            <text x={pad.left} y={16} fill={LEFT_COLOR} fontSize="12" textAnchor="start">
+              {left.label}
             </text>
-            <text x={width - pad.right} y={16} fill={TIME_COLOR} fontSize="12" textAnchor="end">
-              Lap time
+            <text x={width - pad.right} y={16} fill={RIGHT_COLOR} fontSize="12" textAnchor="end">
+              {right.label}
             </text>
-            {placeTicks.map((tick) => {
-              const y = yPlace(tick)
+            {leftScale.ticks.map((tick) => {
+              const y = yOf(leftScale, tick)
               return (
-                <g key={`place-${tick}`}>
+                <g key={`left-${tick}`}>
                   <line x1={pad.left} x2={width - pad.right} y1={y} y2={y} stroke="rgb(255 255 255 / 0.08)" />
-                  <text x={pad.left - 8} y={y + 4} textAnchor="end" fill="#a1a1aa" fontSize="12">
-                    {tick}
+                  <text x={pad.left - 8} y={y + 4} textAnchor="end" fill={leftScale.tickColor} fontSize="12">
+                    {formatMetric(tick, left.kind)}
                   </text>
                 </g>
               )
             })}
-            {timeTicks.map((tick) => (
-              <text key={`time-${tick}`} x={width - pad.right + 8} y={yTime(tick) + 4} fill="#7dd3fc" fontSize="12">
-                {formatAxisTime(tick)}
+            {rightScale.ticks.map((tick) => (
+              <text
+                key={`right-${tick}`}
+                x={width - pad.right + 8}
+                y={yOf(rightScale, tick) + 4}
+                fill={rightScale.tickColor}
+                fontSize="12"
+              >
+                {formatMetric(tick, right.kind)}
               </text>
             ))}
             <line x1={pad.left} x2={pad.left} y1={top} y2={bottom} stroke="#a1a1aa" />
@@ -311,47 +544,47 @@ function ProgressPlot({ points, label }: { points: PlotPoint[]; label: string })
                 </text>
               ) : null,
             )}
-            {placePaths.map((path) => (
+            {leftPaths.map((path) => (
               <polyline
-                key={path}
+                key={`left-${path}`}
                 points={path}
                 fill="none"
-                stroke={PLACE_COLOR}
+                stroke={LEFT_COLOR}
                 strokeWidth="2.5"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
             ))}
-            {timePaths.map((path) => (
+            {rightPaths.map((path) => (
               <polyline
-                key={path}
+                key={`right-${path}`}
                 points={path}
                 fill="none"
-                stroke={TIME_COLOR}
+                stroke={RIGHT_COLOR}
                 strokeWidth="2.5"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
             ))}
             {points.map((point) =>
-              point.place == null ? null : (
+              point.left == null ? null : (
                 <circle
-                  key={`p-${point.lap}`}
+                  key={`left-${point.lap}`}
                   cx={xOf(point.lap)}
-                  cy={yPlace(point.place)}
-                  r={hover?.lap === point.lap && hover.series === 'place' ? 5.5 : 3.5}
-                  fill={PLACE_COLOR}
+                  cy={yOf(leftScale, point.left)}
+                  r={hover?.lap === point.lap && hover.series === 'left' ? 5.5 : 3.5}
+                  fill={LEFT_COLOR}
                 />
               ),
             )}
             {points.map((point) =>
-              point.seconds == null ? null : (
+              point.right == null ? null : (
                 <circle
-                  key={`t-${point.lap}`}
+                  key={`right-${point.lap}`}
                   cx={xOf(point.lap)}
-                  cy={yTime(point.seconds)}
-                  r={hover?.lap === point.lap && hover.series === 'time' ? 5.5 : 3.5}
-                  fill={TIME_COLOR}
+                  cy={yOf(rightScale, point.right)}
+                  r={hover?.lap === point.lap && hover.series === 'right' ? 5.5 : 3.5}
+                  fill={RIGHT_COLOR}
                 />
               ),
             )}
@@ -363,12 +596,7 @@ function ProgressPlot({ points, label }: { points: PlotPoint[]; label: string })
               role="tooltip"
             >
               <p className="font-semibold text-zinc-200">Lap {hover.lap}</p>
-              {hover.series === 'place' && hover.place != null ? (
-                <p style={{ color: PLACE_COLOR }}>Place {hover.place}</p>
-              ) : null}
-              {hover.series === 'time' && hover.seconds != null ? (
-                <p style={{ color: TIME_COLOR }}>Lap time {formatAxisTime(hover.seconds)}</p>
-              ) : null}
+              <p style={{ color: hover.color }}>{hover.text}</p>
             </div>
           ) : null}
         </>

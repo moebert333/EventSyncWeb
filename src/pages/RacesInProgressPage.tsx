@@ -22,6 +22,41 @@ import type { ActiveRaceTiming, RaceStatus } from '../types/database'
 const LIVE: RaceStatus[] = ['Staging', 'Active', 'Paused']
 const EMPTY_PROGRESS: RaceLapProgress = {}
 
+const SORT_COLUMNS = [
+  'class',
+  'place',
+  'plate',
+  'rider',
+  'lap',
+  'lapTime',
+  'bestLap',
+  'elapsed',
+  'leaderGap',
+  'nextGap',
+  'status',
+] as const
+
+type SortColumn = (typeof SORT_COLUMNS)[number]
+type SortDirection = 'asc' | 'desc'
+type SortState = { column: SortColumn; direction: SortDirection }
+
+const DEFAULT_SORT: SortState = { column: 'class', direction: 'asc' }
+const PLACE_SORT: SortState = { column: 'place', direction: 'asc' }
+
+const COLUMN_LABELS: Record<SortColumn, string> = {
+  class: 'Class',
+  place: 'Place',
+  plate: 'Plate',
+  rider: 'Rider',
+  lap: 'Lap',
+  lapTime: 'Lap Time',
+  bestLap: 'Best lap',
+  elapsed: 'Elapsed',
+  leaderGap: 'Gap to leader',
+  nextGap: 'Gap to next',
+  status: 'Status',
+}
+
 function groupByClass(rows: ActiveRaceTiming[]): Map<string, ActiveRaceTiming[]> {
   const sorted = rows.slice().sort((a, b) => {
     return a.class_name.localeCompare(b.class_name) || placeRank(a.place_num) - placeRank(b.place_num)
@@ -53,6 +88,99 @@ function classNamesFor(fromQuery: string[], fromTiming: string[]): string[] {
 
 function rowKey(row: ActiveRaceTiming): string {
   return `${row.class_id}-${row.participant_id}`
+}
+
+function compareText(a: string, b: string, direction: SortDirection): number {
+  const aEmpty = a.trim() === ''
+  const bEmpty = b.trim() === ''
+  if (aEmpty && bEmpty) return 0
+  if (aEmpty) return 1
+  if (bEmpty) return -1
+  const result = a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  return direction === 'asc' ? result : -result
+}
+
+function compareNumber(a: number | null, b: number | null, direction: SortDirection): number {
+  if (a == null && b == null) return 0
+  if (a == null) return 1
+  if (b == null) return -1
+  return direction === 'asc' ? a - b : b - a
+}
+
+function compareColumn(a: ActiveRaceTiming, b: ActiveRaceTiming, column: SortColumn, direction: SortDirection): number {
+  switch (column) {
+    case 'class':
+      return compareText(a.class_name, b.class_name, direction)
+    case 'place': {
+      const rank = (place: string | null) => {
+        const value = placeRank(place)
+        return value >= 8_000 ? null : value
+      }
+      return compareNumber(rank(a.place_num), rank(b.place_num), direction)
+    }
+    case 'plate':
+      return compareText(a.participant_plate ?? '', b.participant_plate ?? '', direction)
+    case 'rider':
+      return compareText(riderName(a.first_name, a.last_name), riderName(b.first_name, b.last_name), direction)
+    case 'lap':
+      return compareNumber(a.current_lap_num, b.current_lap_num, direction)
+    case 'lapTime':
+      return compareNumber(raceTimeSeconds(a.current_lap_time), raceTimeSeconds(b.current_lap_time), direction)
+    case 'bestLap':
+      return (
+        compareNumber(raceTimeSeconds(a.best_lap_time), raceTimeSeconds(b.best_lap_time), direction) ||
+        compareNumber(a.best_lap_num, b.best_lap_num, direction)
+      )
+    case 'elapsed':
+      return compareNumber(raceTimeSeconds(a.race_elapsed_time), raceTimeSeconds(b.race_elapsed_time), direction)
+    case 'leaderGap':
+      return compareNumber(raceTimeSeconds(a.leader_gap_time), raceTimeSeconds(b.leader_gap_time), direction)
+    case 'nextGap':
+      return compareNumber(raceTimeSeconds(a.next_gap_time), raceTimeSeconds(b.next_gap_time), direction)
+    case 'status':
+      return compareText(a.status ?? '', b.status ?? '', direction)
+  }
+}
+
+/** Primary column, then Class, then Place, so the default order is Class then Place. */
+function compareRows(a: ActiveRaceTiming, b: ActiveRaceTiming, sort: SortState): number {
+  const primary = compareColumn(a, b, sort.column, sort.direction)
+  if (primary !== 0) return primary
+  if (sort.column !== 'class') {
+    const byClass = compareText(a.class_name, b.class_name, 'asc')
+    if (byClass !== 0) return byClass
+  }
+  if (sort.column !== 'place') {
+    const byPlace = placeRank(a.place_num) - placeRank(b.place_num)
+    if (byPlace !== 0) return byPlace
+  }
+  return a.participant_id - b.participant_id
+}
+
+function SortHeader({
+  column,
+  sort,
+  onSort,
+}: {
+  column: SortColumn
+  sort: SortState
+  onSort: (column: SortColumn) => void
+}) {
+  const active = sort.column === column
+  return (
+    <th aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button
+        type="button"
+        className={`inline-flex cursor-pointer items-center gap-1 bg-transparent p-0 font-[inherit] text-[length:inherit] tracking-[inherit] uppercase ${
+          active ? 'text-white' : 'text-inherit'
+        }`}
+        onClick={() => onSort(column)}
+      >
+        {COLUMN_LABELS[column]}
+        {active ? <span aria-hidden="true">{sort.direction === 'asc' ? '▲' : '▼'}</span> : null}
+      </button>
+    </th>
+  )
 }
 
 /** Greatest lap, then lowest current lap time. Place breaks remaining ties. */
@@ -88,19 +216,29 @@ export function RacesInProgressPage() {
     (classQuery.data ?? []).map((row) => row.class_name),
     [...groups.keys()],
   )
-  /** Starts unset so the first loaded race (including cached) applies initial video/chart state. */
+  /**
+   * Unset until the first successful load. That race is already on track when
+   * the page is opened, so it does not open the video. A later race id change does.
+   */
   const [selectionRaceId, setSelectionRaceId] = useState<number | null | undefined>(undefined)
   const [pickedClass, setPickedClass] = useState<string | null>(null)
+  const [allClasses, setAllClasses] = useState(false)
+  const [sort, setSort] = useState<SortState>(PLACE_SORT)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [chartOpen, setChartOpen] = useState(false)
   const [videoOpen, setVideoOpen] = useState(false)
 
-  if (selectionRaceId !== raceId) {
+  if (raceQuery.isSuccess && selectionRaceId !== raceId) {
+    const pageJustOpened = selectionRaceId === undefined
     setSelectionRaceId(raceId)
     setPickedClass(null)
+    setAllClasses(false)
+    setSort(PLACE_SORT)
     setSelectedKey(null)
     setChartOpen(false)
-    setVideoOpen(raceStatusVideoSrc(raceQuery.data?.status) != null)
+    if (!pageJustOpened) {
+      setVideoOpen(raceStatusVideoSrc(raceQuery.data?.status) != null)
+    }
   }
 
   const progress = raceId == null ? EMPTY_PROGRESS : recordLapProgress(raceId, timingRows)
@@ -134,8 +272,25 @@ export function RacesInProgressPage() {
   }
 
   const when = [formatEventDate(race.race_date), formatClock(race.race_start)].filter(Boolean).join(' · ')
-  const activeClass = pickedClass != null && classNames.includes(pickedClass) ? pickedClass : (classNames[0] ?? null)
-  const visibleRows = activeClass ? (groups.get(activeClass) ?? []) : []
+  const showingAll = allClasses && classNames.length > 0
+  const activeClass = showingAll
+    ? null
+    : pickedClass != null && classNames.includes(pickedClass)
+      ? pickedClass
+      : (classNames[0] ?? null)
+  const classRows = activeClass ? (groups.get(activeClass) ?? []) : []
+  const visibleRows = (showingAll ? timingRows : classRows).slice().sort((a, b) => compareRows(a, b, sort))
+  const sectionLabel = showingAll ? 'All Classes' : activeClass
+  const tableColumns: SortColumn[] = showingAll
+    ? ['class', 'place', 'plate', 'rider', 'lap', 'lapTime', 'bestLap', 'elapsed', 'leaderGap', 'nextGap', 'status']
+    : ['place', 'plate', 'rider', 'lap', 'lapTime', 'bestLap', 'elapsed', 'leaderGap', 'nextGap', 'status']
+  const chooseSort = (column: SortColumn) => {
+    setSort((current) =>
+      current.column === column
+        ? { column, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { column, direction: 'asc' },
+    )
+  }
   const selectedRow = visibleRows.find((row) => rowKey(row) === selectedKey) ?? null
   const chartRow = selectedRow ?? visibleRows[0] ?? null
   const chartPoints = chartRow ? (progress[progressKey(chartRow.class_id, chartRow.participant_id)] ?? []) : []
@@ -222,12 +377,29 @@ export function RacesInProgressPage() {
                   className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
                     selected ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
                   }`}
-                  onClick={() => setPickedClass(name)}
+                  onClick={() => {
+                    setAllClasses(false)
+                    setPickedClass(name)
+                    setSort((current) => (current.column === 'class' ? PLACE_SORT : current))
+                  }}
                 >
                   {name}
                 </button>
               )
             })}
+            <button
+              type="button"
+              aria-pressed={showingAll}
+              className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
+                showingAll ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
+              }`}
+              onClick={() => {
+                setAllClasses(true)
+                setSort(DEFAULT_SORT)
+              }}
+            >
+              All Classes
+            </button>
           </div>
         ) : null}
       </header>
@@ -245,10 +417,10 @@ export function RacesInProgressPage() {
         <p className="panel">No timing rows for this race yet.</p>
       ) : null}
 
-      {!timingQuery.isLoading && !timingQuery.error && activeClass ? (
-        <section aria-label={activeClass}>
+      {!timingQuery.isLoading && !timingQuery.error && (showingAll || activeClass) ? (
+        <section aria-label={sectionLabel ?? undefined}>
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="font-display text-2xl font-bold uppercase">{activeClass}</h2>
+            <h2 className="font-display text-2xl font-bold uppercase">{sectionLabel}</h2>
             <p className="text-lg font-semibold tabular-nums">
               Elapsed Time: {elapsedDisplay}
             </p>
@@ -257,22 +429,15 @@ export function RacesInProgressPage() {
             </span>
           </div>
           {visibleRows.length === 0 ? (
-            <p className="panel mt-2">No timing rows for this class yet.</p>
+            <p className="panel mt-2">{showingAll ? 'No timing rows yet.' : 'No timing rows for this class yet.'}</p>
           ) : (
             <div className="table-wrap mt-2">
               <table className="data">
                 <thead>
                   <tr>
-                    <th>Place</th>
-                    <th>Plate</th>
-                    <th>Rider</th>
-                    <th>Lap</th>
-                    <th>Current lap</th>
-                    <th>Best lap</th>
-                    <th>Elapsed</th>
-                    <th>Gap to leader</th>
-                    <th>Gap to next</th>
-                    <th>Status</th>
+                    {tableColumns.map((column) => (
+                      <SortHeader key={column} column={column} sort={sort} onSort={chooseSort} />
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -283,30 +448,41 @@ export function RacesInProgressPage() {
                     const className = ['is-selectable', selected ? 'is-selected' : '', isLeader ? 'is-leader' : '']
                       .filter(Boolean)
                       .join(' ')
+                    const cells: Record<SortColumn, string> = {
+                      class: row.class_name,
+                      place: row.place_num ?? '—',
+                      plate: row.participant_plate || '—',
+                      rider: riderName(row.first_name, row.last_name),
+                      lap: row.current_lap_num == null ? '—' : String(row.current_lap_num),
+                      lapTime: formatRaceTime(row.current_lap_time),
+                      bestLap: bestLapLabel(row.best_lap_num, row.best_lap_time),
+                      elapsed: formatRaceTime(row.race_elapsed_time),
+                      leaderGap: formatRaceTime(row.leader_gap_time),
+                      nextGap: formatRaceTime(row.next_gap_time),
+                      status: row.status || '—',
+                    }
                     return (
                       <tr
                         key={key}
                         className={className}
                         tabIndex={0}
                         aria-selected={selected}
-                        onClick={() => setSelectedKey(key)}
-                        onDoubleClick={toggleChart}
+                        onClick={() => {
+                          setSelectedKey(key)
+                          setChartOpen(true)
+                          setVideoOpen(false)
+                        }}
                         onKeyDown={(event) => {
                           if (event.key !== 'Enter' && event.key !== ' ') return
                           event.preventDefault()
                           setSelectedKey(key)
+                          setChartOpen(true)
+                          setVideoOpen(false)
                         }}
                       >
-                        <td>{row.place_num ?? '—'}</td>
-                        <td>{row.participant_plate || '—'}</td>
-                        <td>{riderName(row.first_name, row.last_name)}</td>
-                        <td>{row.current_lap_num ?? '—'}</td>
-                        <td>{formatRaceTime(row.current_lap_time)}</td>
-                        <td>{bestLapLabel(row.best_lap_num, row.best_lap_time)}</td>
-                        <td>{formatRaceTime(row.race_elapsed_time)}</td>
-                        <td>{formatRaceTime(row.leader_gap_time)}</td>
-                        <td>{formatRaceTime(row.next_gap_time)}</td>
-                        <td>{row.status || '—'}</td>
+                        {tableColumns.map((column) => (
+                          <td key={column}>{cells[column]}</td>
+                        ))}
                       </tr>
                     )
                   })}

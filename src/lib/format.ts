@@ -73,5 +73,5 @@ export function placeRank(place: string | null | undefined): number {
 export function bestLapLabel(lapNum: number | null, lapTime: string | null): string {
   const time = formatRaceTime(lapTime)
   if (lapNum == null || lapNum === 0) return time
-  return `#${lapNum} ${time}`
+  return `#${lapNum} - ${time}`
 }

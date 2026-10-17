@@ -83,7 +83,7 @@ Restore on PWA launch so the rider does not re-enter the code every session. Pro
 
 ## Lap progress (client only)
 
-`localStorage` key `eventsync.lapProgress` stores, for the shown race and each participant, the latest current-lap time and place observed for each lap. This history feeds the progress chart on Races In Progress. Clear it when a different race is shown, and when place numbers are all `0` (race restart). It is not live timing, and the service worker must not treat it as a network response. Do not write it back to Supabase.
+`localStorage` key `eventsync.lapProgress` stores, for the shown race and each participant, the latest place, lap time, best lap time, gap to leader, and gap to next observed for each lap. This history feeds the progress chart on Races In Progress. Clear it when a different race is shown, and when place numbers are all `0` (race restart). It is not live timing, and the service worker must not treat it as a network response. Do not write it back to Supabase.
 
 ## HTTPS and deploy
 
