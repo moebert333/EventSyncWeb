@@ -185,9 +185,9 @@ export function CompletedRacesPage() {
       <EventParticipantHeader
         eventId={context.eventId}
         eventName={context.eventName}
+        pageTitle="Completed Race Results"
         onParticipantChanged={() => setAutoApplyDone(false)}
       />
-      <h1 className="font-display text-xl font-extrabold uppercase text-green-500">Completed Race Results</h1>
       {loading || waitingForAutoApply ? <Skeleton rows={4} /> : null}
       {loadError ? (
         <div className="panel" role="alert">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useEventCode } from '../hooks/useEventCode'
 import {
   stagingInRaces,
@@ -15,6 +15,8 @@ const STICKY_TOP = 'top-[calc(3.75rem+env(safe-area-inset-top,0px))]'
 type EventParticipantHeaderProps = {
   eventId: number
   eventName: string
+  /** Current page name shown at the top of the strip. */
+  pageTitle: ReactNode
   /** Called after Ok or Skip when the picker closes (e.g. re-apply class results). */
   onParticipantChanged?: () => void
 }
@@ -22,6 +24,7 @@ type EventParticipantHeaderProps = {
 export function EventParticipantHeader({
   eventId,
   eventName,
+  pageTitle,
   onParticipantChanged,
 }: EventParticipantHeaderProps) {
   const { selectedParticipant } = useEventCode()
@@ -65,10 +68,11 @@ export function EventParticipantHeader({
   return (
     <div
       id="event-participant-header"
-      className={`sticky ${STICKY_TOP} z-20 -mx-4 -mt-6 border-b border-[#f5c518]/35 bg-[#252525] px-4 py-3 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]`}
+      className={`sticky ${STICKY_TOP} z-20 -mx-4 -mt-6 border-b border-[#f5c518]/35 bg-[#252525] px-4 py-2 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]`}
     >
-      <div className="space-y-3">
-        <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-lg font-bold">
+      <div className="space-y-1">
+        <p className="text-xl font-bold leading-tight text-green-500">{pageTitle}</p>
+        <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-lg font-bold leading-tight">
           <span>
             <span className="text-zinc-400">Event:</span> <span className="text-white">{eventName}</span>
           </span>

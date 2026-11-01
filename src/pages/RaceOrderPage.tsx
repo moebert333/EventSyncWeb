@@ -243,8 +243,15 @@ export function RaceOrderPage() {
 
   return (
     <div className="space-y-5">
-      <EventParticipantHeader eventId={context.eventId} eventName={context.eventName} />
-      <h1 className="font-display text-xl font-extrabold uppercase text-sky-400">Race Order</h1>
+      <EventParticipantHeader
+        eventId={context.eventId}
+        eventName={context.eventName}
+        pageTitle={
+          <>
+            Race Order (your races are highlighted in <span className="text-sky-400">Blue</span>)
+          </>
+        }
+      />
 
       {racesQuery.isLoading ? <Skeleton rows={6} /> : null}
       {racesQuery.error ? (

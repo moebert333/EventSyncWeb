@@ -328,6 +328,7 @@ export function RacesInProgressPage() {
         <EventParticipantHeader
           eventId={context.eventId}
           eventName={context.eventName}
+          pageTitle="Active Race"
           onParticipantChanged={() => {
             appliedParticipantRaceRef.current = null
           }}
@@ -343,6 +344,7 @@ export function RacesInProgressPage() {
         <EventParticipantHeader
           eventId={context.eventId}
           eventName={context.eventName}
+          pageTitle="Active Race"
           onParticipantChanged={() => {
             appliedParticipantRaceRef.current = null
           }}
@@ -369,6 +371,7 @@ export function RacesInProgressPage() {
         <EventParticipantHeader
           eventId={context.eventId}
           eventName={context.eventName}
+          pageTitle="Active Race"
           onParticipantChanged={() => {
             appliedParticipantRaceRef.current = null
           }}
@@ -433,6 +436,7 @@ export function RacesInProgressPage() {
       <EventParticipantHeader
         eventId={context.eventId}
         eventName={race.event_name || context.eventName}
+        pageTitle="Active Race"
         onParticipantChanged={() => {
           appliedParticipantRaceRef.current = null
         }}
