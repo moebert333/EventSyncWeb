@@ -3,9 +3,16 @@
   "tasks": [
     {
       "label": "dev",
-      "type": "npm",
-      "script": "dev",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": [
+        "run",
+        "dev"
+      ],
       "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "problemMatcher": {
         "owner": "vite",
         "pattern": {

@@ -1,4 +1,4 @@
-import { isEventCodeShape } from './codes'
+import { escapeIlikePattern, isEventCodeShape } from './codes'
 import type { StoredEventContext } from './eventContext'
 import { supabase } from './supabase'
 
@@ -18,7 +18,11 @@ export async function resolveEventCode(raw: string): Promise<StoredEventContext 
   const code = raw.trim()
   if (!isEventCodeShape(code)) return null
 
-  const codes = await supabase.from('event_codes').select('code, event_id').ilike('code', code).limit(5)
+  const codes = await supabase
+    .from('event_codes')
+    .select('code, event_id')
+    .ilike('code', escapeIlikePattern(code))
+    .limit(5)
   if (codes.error) throw codes.error
   const matches = ((codes.data ?? []) as CodeRow[]).filter(
     (row) => row.code.toLowerCase() === code.toLowerCase(),

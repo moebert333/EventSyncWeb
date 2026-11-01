@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { isEventCodeShape } from '../lib/codes'
-import { loadEventContext, saveEventContext, type StoredEventContext } from '../lib/eventContext'
+import {
+  clearEventContext,
+  loadEventContext,
+  saveEventContext,
+  type StoredEventContext,
+} from '../lib/eventContext'
 import { EventCodeReactContext, type EventCodeApi } from '../lib/eventCodeContext'
 import { resolveEventCode } from '../lib/resolveEventCode'
 
@@ -15,7 +20,13 @@ export function EventCodeProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     resolveEventCode(stored.code)
       .then((fresh) => {
-        if (cancelled || !fresh) return
+        if (cancelled) return
+        if (!fresh) {
+          // Code no longer exists in event_codes (or event chain broke) — drop stale home context.
+          clearEventContext()
+          setContext(null)
+          return
+        }
         saveEventContext(fresh)
         setContext(fresh)
       })

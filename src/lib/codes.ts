@@ -2,7 +2,13 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
 export function isEventCodeShape(value: string): boolean {
   const code = value.trim()
-  return code.length >= 6 && code.length <= 12 && !/[%_]/.test(code)
+  // Length only — matches DB event_codes_code_len. Underscores are valid; LIKE wildcards are escaped at lookup.
+  return code.length >= 6 && code.length <= 12
+}
+
+/** Escape \, %, _ so user codes are exact ILIKE matches, not LIKE wildcards. */
+export function escapeIlikePattern(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
 }
 
 export function generateEventCode(length = 8): string {

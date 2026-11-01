@@ -51,3 +51,9 @@ export function saveEventContext(context: StoredEventContext) {
   localStorage.setItem(CODE_KEY, context.code)
   sessionStorage.setItem(CODE_KEY, context.code)
 }
+
+export function clearEventContext() {
+  localStorage.removeItem(CONTEXT_KEY)
+  localStorage.removeItem(CODE_KEY)
+  sessionStorage.removeItem(CODE_KEY)
+}
