@@ -212,12 +212,18 @@ export function recordLapProgress(raceId: number, rows: ActiveRaceTiming[]): Rac
       leaderGap: keepTime(row.leader_gap_time, previous?.leaderGap),
       nextGap: keepTime(row.next_gap_time, previous?.nextGap),
     }
-    if (previous && sameSample(previous, sample)) continue
-    const nextPoints = points.slice()
-    if (index >= 0) nextPoints[index] = sample
-    else nextPoints.push(sample)
-    nextPoints.sort((a, b) => a.lap - b.lap)
-    draft[key] = nextPoints
+    const sampleChanged = !(previous && sameSample(previous, sample))
+    let nextPoints = points
+    if (sampleChanged) {
+      nextPoints = points.slice()
+      if (index >= 0) nextPoints[index] = sample
+      else nextPoints.push(sample)
+      nextPoints.sort((a, b) => a.lap - b.lap)
+    }
+    // Drop laps beyond the latest reported lap (glitches, restarts, stale storage).
+    const pruned = nextPoints.filter((point) => point.lap <= lap)
+    if (!sampleChanged && pruned.length === points.length) continue
+    draft[key] = pruned
     changed = true
   }
 

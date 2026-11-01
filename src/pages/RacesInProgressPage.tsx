@@ -409,7 +409,11 @@ export function RacesInProgressPage() {
   }
   const selectedRow = visibleRows.find((row) => rowKey(row) === selectedKey) ?? null
   const chartRow = selectedRow ?? visibleRows[0] ?? null
-  const chartPoints = chartRow ? (progress[progressKey(chartRow.class_id, chartRow.participant_id)] ?? []) : []
+  const chartPoints = chartRow
+    ? (progress[progressKey(chartRow.class_id, chartRow.participant_id)] ?? []).filter(
+        (point) => chartRow.current_lap_num == null || point.lap <= chartRow.current_lap_num,
+      )
+    : []
   const highlighted = highlightRow(visibleRows, highlightMode, selectedParticipant?.participantId ?? null)
   const highlightKey = highlighted ? rowKey(highlighted) : null
   const hasStatusVideo = raceStatusVideoSrc(race.status) != null

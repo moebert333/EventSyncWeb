@@ -32,7 +32,11 @@ export function Header() {
               end={link.end}
               title={link.title}
               className={({ isActive }) =>
-                `inline-flex min-h-11 items-center px-3 text-sm font-semibold uppercase tracking-wide ${isActive ? 'text-[#f5c518]' : 'text-zinc-300'}`
+                `inline-flex min-h-11 items-center px-3 text-sm font-semibold uppercase tracking-wide ${
+                  isActive
+                    ? 'bg-[#f5c518]/20 text-[#f5c518]'
+                    : 'text-zinc-300 hover:bg-white/5'
+                }`
               }
             >
               {link.label}
@@ -61,7 +65,9 @@ export function Header() {
               end={link.end}
               title={link.title}
               className={({ isActive }) =>
-                `flex min-h-11 items-center text-base font-semibold uppercase ${isActive ? 'text-[#f5c518]' : ''}`
+                `flex min-h-11 items-center px-3 text-base font-semibold uppercase ${
+                  isActive ? 'bg-[#f5c518]/20 text-[#f5c518]' : ''
+                }`
               }
             >
               {link.label}
