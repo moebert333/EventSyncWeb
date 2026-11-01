@@ -85,6 +85,22 @@ export type RaceClassName = {
   race_id: number
 }
 
+export type EventRaceOrderClass = {
+  class_id: number
+  class_name: string
+}
+
+export type EventRaceOrderRow = {
+  race_id: number
+  race_num: number
+  race_name: string | null
+  session_name: string | null
+  active: boolean
+  completed: boolean
+  status: RaceStatus | null
+  classes: EventRaceOrderClass[]
+}
+
 export type EventClassResult = {
   event_id: number
   event_name: string

@@ -5,8 +5,8 @@ import { AdminCallbackPage } from './pages/admin/AdminCallbackPage'
 import { AdminPage } from './pages/admin/AdminPage'
 import { CompletedRacesPage } from './pages/CompletedRacesPage'
 import { LiveStreamPage } from './pages/future/LiveStreamPage'
-import { RaceOrderPage } from './pages/future/RaceOrderPage'
 import { HomePage } from './pages/HomePage'
+import { RaceOrderPage } from './pages/RaceOrderPage'
 import { RacesInProgressPage } from './pages/RacesInProgressPage'
 
 export default function App() {
@@ -22,10 +22,10 @@ export default function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/order" element={<RaceOrderPage />} />
         <Route path="/live" element={<RacesInProgressPage />} />
         <Route path="/results" element={<CompletedRacesPage />} />
         <Route path="/stream" element={<LiveStreamPage />} />
-        <Route path="/order" element={<RaceOrderPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
       <Route path="/admin/callback" element={<AdminCallbackPage />} />

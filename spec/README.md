@@ -24,6 +24,7 @@ Executable build specs for the EventSync Vite + React + TypeScript + Supabase PW
 - Data UI: **TanStack Query**
 - Live refresh: 2–3s while a race is Staging/Active/Paused
 - Progress chart history: browser `localStorage` only (`eventsync.lapProgress`); cleared on race change or restart (place 0)
+- Optional Selected participant: `localStorage` `eventsync.selectedParticipant`; set on Home or Completed Races; used on Live / Results
 - Status effect media: `public/videos/` (`start_race`, `active_race`, `finish_race` mp4, `pause_race.jpg` while the video button is selected); toggled via a video icon beside the chart icon (mutually exclusive when selecting)
 - PWA: app shell offline, live timing network-only
 - Admin URL hidden from public nav

@@ -155,3 +155,17 @@ table.data tbody tr.is-leader:hover td,
 table.data tbody tr.is-selected.is-leader:hover td {
   background: #b7e6c4;
 }
+
+@keyframes staging-flash {
+  0%,
+  100% {
+    background-color: #facc15;
+  }
+  50% {
+    background-color: #fef08a;
+  }
+}
+
+.staging-flash {
+  animation: staging-flash 0.9s ease-in-out infinite;
+}

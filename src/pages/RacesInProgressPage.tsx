@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { ChartIcon, ProgressTrackingChart } from '../components/ProgressChart'
+import { EventParticipantHeader } from '../components/EventParticipantHeader'
 import { RaceStatusVideo, VideoIcon, raceStatusVideoSrc } from '../components/RaceStatusVideo'
 import { Skeleton } from '../components/Skeleton'
 import { StatusPill } from '../components/StatusPill'
@@ -18,6 +19,14 @@ import {
 } from '../lib/format'
 import { progressKey, recordLapProgress, type RaceLapProgress } from '../lib/progressTracking'
 import type { ActiveRaceTiming, RaceStatus } from '../types/database'
+
+type HighlightMode = 'firstPlace' | 'bestLap' | 'participant'
+
+const HIGHLIGHT_LABELS: Record<HighlightMode, string> = {
+  firstPlace: '1st Place',
+  bestLap: 'Best Lap Time',
+  participant: 'Participant',
+}
 
 const LIVE: RaceStatus[] = ['Staging', 'Active', 'Paused']
 const EMPTY_PROGRESS: RaceLapProgress = {}
@@ -171,6 +180,7 @@ function SortHeader({
     <th aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
       <button
         type="button"
+        title={`Sort by ${COLUMN_LABELS[column]}`}
         className={`inline-flex cursor-pointer items-center gap-1 bg-transparent p-0 font-[inherit] text-[length:inherit] tracking-[inherit] uppercase ${
           active ? 'text-white' : 'text-inherit'
         }`}
@@ -184,7 +194,7 @@ function SortHeader({
 }
 
 /** Greatest lap, then lowest current lap time. Place breaks remaining ties. */
-function leadRow(rows: ActiveRaceTiming[]): ActiveRaceTiming | null {
+function bestLapLeadRow(rows: ActiveRaceTiming[]): ActiveRaceTiming | null {
   const started = rows.filter((row) => (row.current_lap_num ?? 0) >= 1)
   if (started.length === 0) return null
   const maxLap = Math.max(...started.map((row) => row.current_lap_num ?? 0))
@@ -199,8 +209,27 @@ function leadRow(rows: ActiveRaceTiming[]): ActiveRaceTiming | null {
   })[0] ?? null
 }
 
+function firstPlaceRow(rows: ActiveRaceTiming[]): ActiveRaceTiming | null {
+  const contenders = rows.filter((row) => placeRank(row.place_num) === 1)
+  if (contenders.length === 0) return null
+  return contenders.slice().sort((a, b) => a.participant_id - b.participant_id)[0] ?? null
+}
+
+function highlightRow(
+  rows: ActiveRaceTiming[],
+  mode: HighlightMode,
+  participantId: number | null,
+): ActiveRaceTiming | null {
+  if (mode === 'firstPlace') return firstPlaceRow(rows)
+  if (mode === 'participant') {
+    if (participantId == null) return null
+    return rows.find((row) => row.participant_id === participantId) ?? null
+  }
+  return bestLapLeadRow(rows)
+}
+
 export function RacesInProgressPage() {
-  const { context } = useEventCode()
+  const { context, selectedParticipant } = useEventCode()
   const raceQuery = useRaceInProgress(context?.eventId ?? null, context?.seriesId ?? null)
   const live = raceQuery.data?.status != null && LIVE.includes(raceQuery.data.status)
   const timingQuery = useLiveTiming(raceQuery.data)
@@ -216,10 +245,7 @@ export function RacesInProgressPage() {
     (classQuery.data ?? []).map((row) => row.class_name),
     [...groups.keys()],
   )
-  /**
-   * Unset until the first successful load. That race is already on track when
-   * the page is opened, so it does not open the video. A later race id change does.
-   */
+  /** Unset until the first successful load; then tracks the shown race id. */
   const [selectionRaceId, setSelectionRaceId] = useState<number | null | undefined>(undefined)
   const [pickedClass, setPickedClass] = useState<string | null>(null)
   const [allClasses, setAllClasses] = useState(false)
@@ -227,33 +253,111 @@ export function RacesInProgressPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [chartOpen, setChartOpen] = useState(false)
   const [videoOpen, setVideoOpen] = useState(false)
+  const [highlightMode, setHighlightMode] = useState<HighlightMode>('bestLap')
+  const [highlightMenuOpen, setHighlightMenuOpen] = useState(false)
+  const highlightMenuRef = useRef<HTMLDivElement>(null)
+  const appliedParticipantRaceRef = useRef<number | null>(null)
+  /** Prefer video over participant chart on first land and when race changes while open. */
+  const preferVideoForRaceRef = useRef(false)
 
   if (raceQuery.isSuccess && selectionRaceId !== raceId) {
-    const pageJustOpened = selectionRaceId === undefined
+    const hasVideo = raceId != null && raceStatusVideoSrc(raceQuery.data?.status) != null
     setSelectionRaceId(raceId)
     setPickedClass(null)
     setAllClasses(false)
     setSort(PLACE_SORT)
     setSelectedKey(null)
     setChartOpen(false)
-    if (!pageJustOpened) {
-      setVideoOpen(raceStatusVideoSrc(raceQuery.data?.status) != null)
+    appliedParticipantRaceRef.current = null
+    // Open video on first land and whenever the shown race changes (when media exists).
+    preferVideoForRaceRef.current = hasVideo
+    setVideoOpen(hasVideo)
+  }
+
+  if (
+    raceId != null &&
+    appliedParticipantRaceRef.current !== raceId &&
+    timingQuery.isSuccess &&
+    selectedParticipant
+  ) {
+    const match = timingRows.find((row) => row.participant_id === selectedParticipant.participantId)
+    if (match) {
+      appliedParticipantRaceRef.current = raceId
+      setAllClasses(false)
+      setPickedClass(match.class_name)
+      setSort(PLACE_SORT)
+      setSelectedKey(rowKey(match))
+      if (!preferVideoForRaceRef.current) {
+        setChartOpen(true)
+        setVideoOpen(false)
+      }
+    } else if (timingRows.length > 0) {
+      // Race has timing; selected participant is not in this race.
+      appliedParticipantRaceRef.current = raceId
     }
   }
+
+  useEffect(() => {
+    if (!highlightMenuOpen) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (highlightMenuRef.current?.contains(event.target as Node)) return
+      setHighlightMenuOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setHighlightMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [highlightMenuOpen])
+
+  useEffect(() => {
+    appliedParticipantRaceRef.current = null
+  }, [selectedParticipant?.participantId])
 
   const progress = raceId == null ? EMPTY_PROGRESS : recordLapProgress(raceId, timingRows)
 
   if (!context) return <Navigate to="/?needCode=1" replace />
 
-  if (raceQuery.isLoading) return <Skeleton />
+  if (raceQuery.isLoading) {
+    return (
+      <div className="space-y-5">
+        <EventParticipantHeader
+          eventId={context.eventId}
+          eventName={context.eventName}
+          onParticipantChanged={() => {
+            appliedParticipantRaceRef.current = null
+          }}
+        />
+        <Skeleton />
+      </div>
+    )
+  }
 
   if (raceQuery.error) {
     return (
-      <div className="panel" role="alert">
-        <p>{raceQuery.error instanceof Error ? raceQuery.error.message : 'Could not load the live race.'}</p>
-        <button type="button" className="btn mt-4" onClick={() => void raceQuery.refetch()}>
-          Retry
-        </button>
+      <div className="space-y-5">
+        <EventParticipantHeader
+          eventId={context.eventId}
+          eventName={context.eventName}
+          onParticipantChanged={() => {
+            appliedParticipantRaceRef.current = null
+          }}
+        />
+        <div className="panel" role="alert">
+          <p>{raceQuery.error instanceof Error ? raceQuery.error.message : 'Could not load the live race.'}</p>
+          <button
+            type="button"
+            className="btn mt-4"
+            title="Retry loading the live race"
+            onClick={() => void raceQuery.refetch()}
+          >
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
@@ -261,12 +365,21 @@ export function RacesInProgressPage() {
   const race = raceQuery.data
   if (!race) {
     return (
-      <div className="panel">
-        <h1 className="font-display text-4xl font-extrabold uppercase">Races in progress</h1>
-        <p className="mt-3 text-lg">No race is staging or on track right now.</p>
-        <Link to="/results" className="btn mt-5">
-          Completed races
-        </Link>
+      <div className="space-y-5">
+        <EventParticipantHeader
+          eventId={context.eventId}
+          eventName={context.eventName}
+          onParticipantChanged={() => {
+            appliedParticipantRaceRef.current = null
+          }}
+        />
+        <div className="panel">
+          <h1 className="font-display text-4xl font-extrabold uppercase">Races in progress</h1>
+          <p className="mt-3 text-lg">No race is staging or on track right now.</p>
+          <Link to="/results" className="btn mt-5" title="View completed race results">
+            Completed races
+          </Link>
+        </div>
       </div>
     )
   }
@@ -294,8 +407,8 @@ export function RacesInProgressPage() {
   const selectedRow = visibleRows.find((row) => rowKey(row) === selectedKey) ?? null
   const chartRow = selectedRow ?? visibleRows[0] ?? null
   const chartPoints = chartRow ? (progress[progressKey(chartRow.class_id, chartRow.participant_id)] ?? []) : []
-  const leader = leadRow(visibleRows)
-  const leaderKey = leader ? rowKey(leader) : null
+  const highlighted = highlightRow(visibleRows, highlightMode, selectedParticipant?.participantId ?? null)
+  const highlightKey = highlighted ? rowKey(highlighted) : null
   const hasStatusVideo = raceStatusVideoSrc(race.status) != null
   /** Selecting one panel deselects the other; unselecting leaves the other alone. */
   const toggleChart = () => {
@@ -317,8 +430,14 @@ export function RacesInProgressPage() {
 
   return (
     <div className="space-y-5">
+      <EventParticipantHeader
+        eventId={context.eventId}
+        eventName={race.event_name || context.eventName}
+        onParticipantChanged={() => {
+          appliedParticipantRaceRef.current = null
+        }}
+      />
       <header className="border-b border-[#f5c518] pb-4">
-        <p className="text-lg font-bold">Event Name: {race.event_name}</p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="font-display text-4xl font-extrabold uppercase">Race {race.race_num}</h1>
           <StatusPill status={race.status} />
@@ -328,6 +447,7 @@ export function RacesInProgressPage() {
               chartOpen ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/30 bg-transparent text-white'
             }`}
             aria-label="Progress tracking chart"
+            title={chartOpen ? 'Hide progress chart' : 'Show progress chart'}
             aria-pressed={chartOpen}
             aria-controls="progress-chart"
             onClick={toggleChart}
@@ -341,6 +461,7 @@ export function RacesInProgressPage() {
                 videoOpen ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/30 bg-transparent text-white'
               }`}
               aria-label="Race status video"
+              title={videoOpen ? 'Hide status video' : 'Show status video'}
               aria-pressed={videoOpen}
               aria-controls="race-status-video"
               onClick={toggleVideo}
@@ -374,6 +495,7 @@ export function RacesInProgressPage() {
                   key={name}
                   type="button"
                   aria-pressed={selected}
+                  title={`Show ${name} timing`}
                   className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
                     selected ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
                   }`}
@@ -390,6 +512,7 @@ export function RacesInProgressPage() {
             <button
               type="button"
               aria-pressed={showingAll}
+              title="Show timing for all classes"
               className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
                 showingAll ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
               }`}
@@ -408,7 +531,12 @@ export function RacesInProgressPage() {
       {timingQuery.error ? (
         <div className="panel" role="alert">
           <p>{timingQuery.error instanceof Error ? timingQuery.error.message : 'Could not load timing.'}</p>
-          <button type="button" className="btn mt-4" onClick={() => void timingQuery.refetch()}>
+          <button
+            type="button"
+            className="btn mt-4"
+            title="Retry loading timing"
+            onClick={() => void timingQuery.refetch()}
+          >
             Retry
           </button>
         </div>
@@ -424,9 +552,43 @@ export function RacesInProgressPage() {
             <p className="text-lg font-semibold tabular-nums">
               Elapsed Time: {elapsedDisplay}
             </p>
-            <span className="ml-auto inline-flex min-h-8 items-center bg-[#c9efd4] px-3 text-sm font-bold text-black">
-              Best Lap Time
-            </span>
+            <div className="relative ml-auto" ref={highlightMenuRef}>
+              <button
+                type="button"
+                className="inline-flex min-h-8 cursor-pointer items-center bg-[#c9efd4] px-3 text-sm font-bold text-black"
+                aria-haspopup="listbox"
+                aria-expanded={highlightMenuOpen}
+                title="Choose which row gets the green highlight"
+                onClick={() => setHighlightMenuOpen((open) => !open)}
+              >
+                {HIGHLIGHT_LABELS[highlightMode]}
+              </button>
+              {highlightMenuOpen ? (
+                <ul
+                  role="listbox"
+                  aria-label="Green row highlight"
+                  className="absolute right-0 z-20 mt-1 min-w-full border border-white/20 bg-[#1a1a1a] py-1 shadow-lg"
+                >
+                  {(Object.keys(HIGHLIGHT_LABELS) as HighlightMode[]).map((mode) => (
+                    <li key={mode} role="option" aria-selected={highlightMode === mode}>
+                      <button
+                        type="button"
+                        className={`block w-full cursor-pointer px-3 py-2 text-left text-sm font-bold ${
+                          highlightMode === mode ? 'bg-[#c9efd4] text-black' : 'text-white hover:bg-white/10'
+                        }`}
+                        title={`Highlight ${HIGHLIGHT_LABELS[mode]}`}
+                        onClick={() => {
+                          setHighlightMode(mode)
+                          setHighlightMenuOpen(false)
+                        }}
+                      >
+                        {HIGHLIGHT_LABELS[mode]}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           </div>
           {visibleRows.length === 0 ? (
             <p className="panel mt-2">{showingAll ? 'No timing rows yet.' : 'No timing rows for this class yet.'}</p>
@@ -444,7 +606,7 @@ export function RacesInProgressPage() {
                   {visibleRows.map((row) => {
                     const key = rowKey(row)
                     const selected = key === selectedKey
-                    const isLeader = key === leaderKey
+                    const isLeader = key === highlightKey
                     const className = ['is-selectable', selected ? 'is-selected' : '', isLeader ? 'is-leader' : '']
                       .filter(Boolean)
                       .join(' ')
@@ -467,6 +629,7 @@ export function RacesInProgressPage() {
                         className={className}
                         tabIndex={0}
                         aria-selected={selected}
+                        title={`Select ${riderName(row.first_name, row.last_name)} and show chart`}
                         onClick={() => {
                           setSelectedKey(key)
                           setChartOpen(true)

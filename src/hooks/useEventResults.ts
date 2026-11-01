@@ -84,6 +84,33 @@ export function useEventParticipants(eventId: number | null) {
   })
 }
 
+/** Class names the participant is entered in for an event, sorted by name. */
+export function useParticipantEventClasses(eventId: number | null, participantId: number | null) {
+  return useQuery({
+    queryKey: ['participant-event-classes', eventId, participantId],
+    enabled: eventId != null && participantId != null,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('event_entry')
+        .select('classes(class_name)')
+        .eq('event_id', eventId!)
+        .eq('participant_id', participantId!)
+      if (error) throw error
+      const names: string[] = []
+      const seen = new Set<string>()
+      for (const row of data ?? []) {
+        const related = (row as { classes: { class_name: string } | { class_name: string }[] | null }).classes
+        const className = Array.isArray(related) ? related[0]?.class_name : related?.class_name
+        if (!className || seen.has(className)) continue
+        seen.add(className)
+        names.push(className)
+      }
+      names.sort((a, b) => a.localeCompare(b))
+      return names
+    },
+  })
+}
+
 export function useEventResults(filter: ResultsFilter | null) {
   return useQuery({
     queryKey: ['event-results', filter],

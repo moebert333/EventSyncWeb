@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { SelectParticipantBox } from '../components/SelectParticipantBox'
 import { newsArticles } from '../data/news'
 import { useEventCode } from '../hooks/useEventCode'
+import { useRaceInProgress } from '../hooks/useRaceInProgress'
 import { formatEventDate } from '../lib/format'
+import type { RaceStatus } from '../types/database'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
 }
+
+const IN_PROGRESS: RaceStatus[] = ['Staging', 'Active', 'Paused']
 
 function isIosDevice(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -18,9 +23,12 @@ function isStandalone(): boolean {
 }
 
 export function HomePage() {
+  const navigate = useNavigate()
   const { context, error, resolving, submitCode } = useEventCode()
+  const raceQuery = useRaceInProgress(context?.eventId ?? null, context?.seriesId ?? null)
   const [params] = useSearchParams()
   const [draft, setDraft] = useState('')
+  const [promptParticipant, setPromptParticipant] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const tried = useRef<string | null>(null)
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null)
@@ -30,7 +38,9 @@ export function HomePage() {
   useEffect(() => {
     if (!codeParam || tried.current === codeParam) return
     tried.current = codeParam
-    void submitCode(codeParam)
+    void submitCode(codeParam).then((ok) => {
+      if (ok) setPromptParticipant(true)
+    })
   }, [codeParam, submitCode])
 
   useEffect(() => {
@@ -49,24 +59,42 @@ export function HomePage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     const ok = await submitCode(draft)
-    if (ok) setDraft('')
+    if (ok) {
+      setDraft('')
+      setPromptParticipant(true)
+    }
+  }
+
+  function goAfterParticipantStep() {
+    const status = raceQuery.data?.status
+    const inProgress = status != null && IN_PROGRESS.includes(status)
+    navigate(inProgress ? '/live' : '/order')
+  }
+
+  function onParticipantOk() {
+    goAfterParticipantStep()
+  }
+
+  function onParticipantSkip() {
+    // Keep any already-selected participant; Skip only continues.
+    goAfterParticipantStep()
   }
 
   const dateLabel = formatEventDate(context?.eventDate)
   const place = [context?.track, context?.location].filter(Boolean).join(' · ')
   const showIosHint = isIosDevice() && !isStandalone()
+  const actionsBusy = promptParticipant && raceQuery.isLoading
 
   return (
     <div className="space-y-10">
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
         <section>
-          <img src="/rider.svg" alt="Motocross racer" className="mb-4 h-[6.75rem] w-auto" />
-          <h1 className="font-display text-4xl font-extrabold uppercase leading-none tracking-tight sm:text-[3.375rem]">
-            Live laps. Staging. Results. Don’t miss your moto.
-          </h1>
-          <p className="mt-4 max-w-xl text-lg text-zinc-300">
-            EventSync shows in-progress timing and completed results pushed from the track. No racer login.
-          </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <img src="/rider.svg" alt="Motocross racer" className="h-[6.75rem] w-auto shrink-0" />
+            <h1 className="min-w-0 flex-1 basis-[12rem] font-display text-3xl font-extrabold uppercase leading-none tracking-tight sm:text-4xl">
+              Live laps. Staging. Results. Don’t miss your moto.
+            </h1>
+          </div>
 
           <form id="event-code" onSubmit={onSubmit} className="mt-8 max-w-md">
             <label htmlFor="event-code-input" className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
@@ -86,7 +114,7 @@ export function HomePage() {
                 aria-describedby={error ? 'event-code-error' : undefined}
                 onChange={(event) => setDraft(event.target.value)}
               />
-              <button className="btn" type="submit" disabled={resolving}>
+              <button className="btn" type="submit" disabled={resolving} title="Resolve this Event Code">
                 {resolving ? 'Checking…' : 'Go to event'}
               </button>
             </div>
@@ -94,7 +122,11 @@ export function HomePage() {
               <button
                 type="button"
                 className="mt-3 text-sm font-semibold uppercase text-[#f5c518]"
-                onClick={() => inputRef.current?.focus()}
+                title="Enter a different Event Code"
+                onClick={() => {
+                  setPromptParticipant(false)
+                  inputRef.current?.focus()
+                }}
               >
                 Change event
               </button>
@@ -110,20 +142,34 @@ export function HomePage() {
           </form>
 
           {context ? (
-            <Link
-              to="/live"
-              className="mt-6 inline-flex max-w-lg cursor-pointer flex-col gap-1 border border-[#f5c518] px-4 py-3 no-underline"
-              aria-label={`Open races in progress for ${context.eventName}`}
-            >
-              <span className="font-display text-2xl font-bold uppercase">{context.organizationName}</span>
-              <span className="text-lg">{context.eventName}</span>
-              {dateLabel || place ? (
-                <span className="text-sm text-zinc-400">
-                  {[dateLabel, place].filter(Boolean).join(' · ')}
-                </span>
+            <div className="mt-6 max-w-lg space-y-4">
+              <button
+                type="button"
+                className="inline-flex w-full cursor-pointer flex-col gap-1 border border-[#f5c518] bg-transparent px-4 py-3 text-left disabled:cursor-wait"
+                aria-label={`Open ${context.eventName}`}
+                title="Open live timing or results for this event"
+                disabled={raceQuery.isLoading}
+                onClick={goAfterParticipantStep}
+              >
+                <span className="font-display text-2xl font-bold uppercase">{context.organizationName}</span>
+                <span className="text-lg">{context.eventName}</span>
+                {dateLabel || place ? (
+                  <span className="text-sm text-zinc-400">
+                    {[dateLabel, place].filter(Boolean).join(' · ')}
+                  </span>
+                ) : null}
+                <span className="text-xs uppercase tracking-widest text-zinc-500">{context.code}</span>
+              </button>
+
+              {promptParticipant ? (
+                <SelectParticipantBox
+                  eventId={context.eventId}
+                  onOk={onParticipantOk}
+                  onSkip={onParticipantSkip}
+                  actionsBusy={actionsBusy}
+                />
               ) : null}
-              <span className="text-xs uppercase tracking-widest text-zinc-500">{context.code}</span>
-            </Link>
+            </div>
           ) : null}
 
           {showIosHint ? (
@@ -133,6 +179,7 @@ export function HomePage() {
             <button
               type="button"
               className="btn btn-ghost mt-4"
+              title="Install EventSync on this device"
               onClick={() => {
                 void installEvent.prompt()
                 setInstallEvent(null)
@@ -152,6 +199,7 @@ export function HomePage() {
                   href={article.href}
                   target="_blank"
                   rel="noreferrer"
+                  title={`Open article: ${article.title}`}
                   className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 border border-white/10 bg-[#1a1a1a] p-2"
                 >
                   <img src={article.imageUrl} alt="" className="h-24 w-24 object-cover" />
@@ -166,14 +214,33 @@ export function HomePage() {
         </aside>
       </div>
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <Link to="/live" className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Link
+          to="/order"
+          title="View race order for this event"
+          className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline"
+        >
+          Race order
+        </Link>
+        <Link
+          to="/live"
+          title="View live race timing"
+          className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline"
+        >
           Races in progress
         </Link>
-        <Link to="/results" className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline">
+        <Link
+          to="/results"
+          title="View completed race results"
+          className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline"
+        >
           Completed races
         </Link>
-        <Link to="/stream" className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline">
+        <Link
+          to="/stream"
+          title="View live stream (coming soon)"
+          className="panel cursor-pointer font-display text-2xl font-bold uppercase no-underline"
+        >
           Live stream
         </Link>
       </section>

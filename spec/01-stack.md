@@ -71,18 +71,22 @@ eventsync/
     index.css
     lib/supabase.ts
     lib/eventContext.ts
+    lib/selectedParticipant.ts
     types/database.ts          # generated or hand-maintained from schema
     hooks/useEventCode.ts
     hooks/useRaceInProgress.ts
     hooks/useEventResults.ts
     components/
+    components/SelectParticipantBox.tsx
+    components/EventParticipantHeader.tsx
     pages/HomePage.tsx
     pages/RacesInProgressPage.tsx
     pages/CompletedRacesPage.tsx
     pages/admin/AdminLoginPage.tsx
     pages/admin/AdminCallbackPage.tsx
     pages/admin/OrganizationAdminPage.tsx
-    pages/future/RaceOrderPage.tsx      # stub route ok
+    pages/RaceOrderPage.tsx
+    hooks/useEventRaceOrder.ts
     pages/future/LiveStreamPage.tsx     # stub + “coming soon”
 ```
 
@@ -118,7 +122,8 @@ Production-like check: `npm run build` && `npm run preview` or `npx serve dist -
 ## Data fetching rules
 
 - All Supabase reads go through TanStack Query.
-- Live timing query: `refetchInterval` 2–3 seconds while status is `Staging` | `Active` | `Paused`; stop interval when no in-progress race.
+- Race-in-progress query: `refetchInterval` ~2.5s whenever an event is selected (including empty/Finished) so a newly active race appears automatically.
+- Live timing query: `refetchInterval` ~2.5s while status is `Staging` | `Active` | `Paused`; pause timing polls when Finished/absent.
 - Mutations exist only on admin pages (organizations, series, events, event_codes).
 - Spectator pages are `SELECT` only.
 
@@ -142,7 +147,7 @@ On valid code:
 4. Deploy HTTPS; set Supabase Auth redirect URLs.
 5. Races In Progress + Completed Races.
 6. Re-deploy and test.
-7. Race order / announcements + Live Stream (FUTURE — stub pages allowed before this).
+7. Race Order page + Live Stream / announcements (stream stub ok).
 8. Re-deploy and test.
 
 Do not start PWA or live pages before Home + Event Code resolution works.

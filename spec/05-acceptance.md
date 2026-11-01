@@ -34,12 +34,15 @@ PWA after Home + Admin work, not before Event Code resolution.
 
 ## C. Home
 
-- [ ] Top nav: Home, Races In Progress, Completed Races, Live Stream
+- [ ] Top nav: Home, Race Order, Races In Progress, Completed Races, Live Stream
+- [ ] Actionable controls show a short hover description (`title`)
 - [ ] No Admin link in that nav
 - [ ] Large marketing description of the product
 - [ ] MX racer logo image present
 - [ ] Right column news cards (static list acceptable) with image, summary, outbound link
 - [ ] Style is dark magazine / MX Action–inspired, not default Vite template
+- [ ] After Event Code resolves/changes, Select participant panel with Ok / Skip; then route to Live if Staging/Active/Paused else Completed Races
+- [ ] Selected participant persists in `localStorage` (`eventsync.selectedParticipant`) and clears when the event changes
 
 ## D. Admin magic link
 
@@ -64,13 +67,16 @@ PWA after Home + Admin work, not before Event Code resolution.
 
 - [ ] Uses `race_in_progress` + `active_race_timing` (+ class names view)
 - [ ] Zero rows → empty state, not a crash
-- [ ] One live race: header prefixed “Event Name:” (larger, bold), race number, session, status, and class list
+- [ ] Top Event / clickable Participant (or Select Participant) header with Staging in: N when a participant has an upcoming race (yellow at 2, flashing at 1); one live race shows race number, session, status, and class list
+- [ ] Status pill colors: Waiting light grey, Staging light orange, Active green, Paused yellow, Finished light blue (contrasting text); click shows `Race status: {status}`
 - [ ] Class chips are buttons. One class is selected (accent background), or All Classes to the right of the chips. Only that class table is shown unless All Classes is selected. First class is selected on load.
+- [ ] Switching to the page with a Selected participant who is in the race selects that class/row and opens the chart (once per shown race)
 - [ ] One row per participant in the selected class. No Class column. A single class starts sorted by place. All Classes lists every class, adds a Class column, and defaults to Class then Place. Clicking any column header sorts that table; clicking it again reverses the order. Best lap shows as `#n - time`.
-- [ ] Class name line shows “Elapsed Time:” with race elapsed time to the second (local 1s tick while Active between polls), then a light-green “Best Lap Time” label with black text, just above the table
+- [ ] Class name line shows “Elapsed Time:” with race elapsed time to the second (local 1s tick while Active between polls), then a clickable light-green highlight-mode label (default “Best Lap Time”) with black text, just above the table
+- [ ] Highlight-mode menu offers 1st Place, Best Lap Time, and Participant; green row highlight follows the choice
 - [ ] Clicking a row selects it with a light grey shade
 - [ ] Clicking a row selects it and opens the progress chart, with the chart button selected and the video closed
-- [ ] Once any visible row has lap ≥ 1, the row on the greatest lap with the lowest current lap time is shaded light green
+- [ ] Best Lap Time mode: once any visible row has lap ≥ 1, the row on the greatest lap with the lowest current lap time is shaded light green
 - [ ] The current-lap column is labeled Lap Time
 - [ ] Each poll stores place, lap time, best lap time, gap to leader, and gap to next per participant and lap in `localStorage` (`eventsync.lapProgress`). Nothing is written to Supabase.
 - [ ] Saved chart data is cleared when a different race is shown
@@ -83,25 +89,40 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] Fewer than 2 stored laps shows “Chart is Waiting for 2 Laps Data...”
 - [ ] Finished races from `race_in_progress` still show the header and `active_race_timing` table
 - [ ] Timing polls only while status is Staging / Active / Paused; Finished still loads timing once
+- [ ] Race header keeps polling when empty or Finished so a newly active race for the event appears without a manual refresh
+- [ ] A newly detected race while the page is open closes the chart and opens the status video (when available)
 - [ ] Scoped to Event Code’s event (or series fallback as in data spec)
 
 ## G. Completed Races
 
 - [ ] Org name read-only from Event Code
 - [ ] Series filter (all or one) then event picker; default event = coded event
+- [ ] Top Event / clickable Participant header (same as Live)
+- [ ] Collapsible “Select Results Filter:” panel with up/down control; Show results collapses it
 - [ ] Filter by class **or** participant, then Show results
+- [ ] Entering with a Selected participant who has an event class selects that first class, loads class results, and collapses the panel; otherwise the panel stays expanded
+- [ ] Selected participant row in class results is highlighted light grey when present
+- [ ] Changing the Participant dropdown updates the Selected participant
 - [ ] Rows from `event_class_results`
 - [ ] Empty and error states handled
 - [ ] Switching event inside the same org does not require a new code
 
-## H. Security
+## H. Race Order
+
+- [ ] `/order` requires Event Code context
+- [ ] Same Event / Participant header with Staging in countdown
+- [ ] Races listed by `race_num` with expand for class names
+- [ ] Completed / Active / Participant marked by color and label
+- [ ] Empty and error states handled
+
+## I. Security
 
 - [ ] Service role key absent from repo and client bundle
 - [ ] RLS enabled; anon cannot write
 - [ ] Admin writes limited to org/series/events/event_codes as specified
 - [ ] Timing/results writes remain the local race app’s job
 
-## I. PWA / deploy
+## J. PWA / deploy
 
 - [ ] Manifest standalone + 192/512 icons
 - [ ] SPA fallback so `/live` refresh works
@@ -110,9 +131,9 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] Installable on Android Chrome; iOS hint documented or shown
 - [ ] Live data not served from a stale SW cache as if current
 
-## J. Explicitly not failing MVP
+## K. Explicitly not failing MVP
 
-- Race order / announcements content
+- Announcements on Race Order
 - Multi-camera live stream
 - Spectator accounts
 - Offline timing

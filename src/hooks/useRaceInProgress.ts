@@ -4,11 +4,6 @@ import type { ActiveRaceTiming, RaceClassName, RaceInProgress, RaceStatus } from
 
 /** Statuses that still poll for live updates. */
 const LIVE: RaceStatus[] = ['Staging', 'Active', 'Paused']
-/**
- * Statuses shown by `race_in_progress` (active race + these statuses).
- * Finished stays visible so final `active_race_timing` can still be shown.
- */
-const SHOWN: RaceStatus[] = ['Staging', 'Active', 'Paused', 'Finished']
 const RACE_COLUMNS =
   'race_num, race_id, event_id, series_id, event_name, session_name, race_date, race_start, description, elapsed_race_time, status'
 const TIMING_COLUMNS =
@@ -16,10 +11,6 @@ const TIMING_COLUMNS =
 
 function isLive(status: RaceStatus | null | undefined): boolean {
   return status != null && LIVE.includes(status)
-}
-
-function isShown(status: RaceStatus | null | undefined): boolean {
-  return status != null && SHOWN.includes(status)
 }
 
 export function useRaceInProgress(eventId: number | null, seriesId: number | null) {
@@ -44,8 +35,9 @@ export function useRaceInProgress(eventId: number | null, seriesId: number | nul
       if (bySeries.error) throw bySeries.error
       return (bySeries.data?.[0] ?? null) as RaceInProgress | null
     },
-    // Keep polling through Finished so the next Staging/Active race can replace it.
-    refetchInterval: (query) => (isShown(query.state.data?.status) ? 2500 : false),
+    // Always poll while an event is selected: empty → pick up a newly active race;
+    // Finished → pick up the next Staging/Active race; live → keep header/status fresh.
+    refetchInterval: 2500,
   })
 }
 

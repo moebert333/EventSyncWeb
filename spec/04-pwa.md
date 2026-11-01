@@ -81,6 +81,20 @@ Save resolved context in `localStorage` key `eventsync.eventContext`:
 
 Restore on PWA launch so the rider does not re-enter the code every session. Provide “Change event” on Home.
 
+Optional Selected participant in `localStorage` key `eventsync.selectedParticipant`:
+
+```json
+{
+  "eventId": 1,
+  "participantId": 42,
+  "firstName": "…",
+  "lastName": "…",
+  "participantPlate": "123"
+}
+```
+
+Restore with the event context. Clear when the resolved Event Code points at a different event.
+
 ## Lap progress (client only)
 
 `localStorage` key `eventsync.lapProgress` stores, for the shown race and each participant, the latest place, lap time, best lap time, gap to leader, and gap to next observed for each lap. This history feeds the progress chart on Races In Progress. Clear it when a different race is shown, and when place numbers are all `0` (race restart). It is not live timing, and the service worker must not treat it as a network response. Do not write it back to Supabase.

@@ -268,7 +268,12 @@ export function ProgressTrackingChart({ riderLabel, points }: Props) {
                 setDraftRight(id)
               }}
             />
-            <button type="button" className="btn min-h-11 px-4 text-base" onClick={saveAxes}>
+            <button
+              type="button"
+              className="btn min-h-11 px-4 text-base"
+              title="Save chart axis choices"
+              onClick={saveAxes}
+            >
               Save
             </button>
           </>
@@ -278,6 +283,7 @@ export function ProgressTrackingChart({ riderLabel, points }: Props) {
             className="inline-flex cursor-pointer flex-wrap items-center gap-4"
             aria-expanded={false}
             aria-label="Choose chart axes"
+            title="Choose chart left and right axes"
             onClick={openAxes}
           >
             <span className="inline-flex items-center gap-2">

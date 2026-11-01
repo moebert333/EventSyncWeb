@@ -58,7 +58,7 @@ Function `place_label(pos int)`: `NULL` → null; `> 80` → `DNS/DNF`; else pos
 | `race_in_progress` | Races In Progress header (0 or 1 row per series/event filter) |
 | `active_race_timing` | Timing rows (place, laps, gaps, names, plates) |
 | `event_class_results` | Completed Races grid |
-| `race_class_names` | Classes under a race; Race order page later |
+| `race_class_names` | Classes under a race (also `race_class` + `classes` on Race Order) |
 
 `race_in_progress` already joins `races` + `events` + `status` where `races.active` is true and status ∈ (`Staging`, `Active`, `Paused`, `Finished`). Finished stays in the view so the live page can keep showing that race and its `active_race_timing` rows until the race is no longer active.
 

@@ -18,10 +18,12 @@ EventSync is a public website and installable PWA for racers and spectators at a
 ## User jobs (MVP)
 
 1. Scan a QR or type a 6–12 character Event Code and land on that organization + event.
-2. See that a race is staging / in progress / paused, choose one class, and follow live participant timing plus a place and lap-time progress chart.
-3. Browse completed event results, filter by series → event → class or participant.
-4. Install the site on a phone home screen and reopen it without signing in (public pages).
-5. An allowlisted organizer signs in with a magic link and creates/edits organization, series, events, and Event Codes.
+2. Optionally pick a Selected participant on Home (search name/plate) to carry into live timing and completed results.
+3. See that a race is staging / in progress / paused, choose one class, and follow live participant timing plus a place and lap-time progress chart.
+4. Browse completed event results, filter by series → event → class or participant.
+5. See the event race order by race number, with completed/active markers and Selected participant races highlighted; see Staging in countdown beside the participant.
+6. Install the site on a phone home screen and reopen it without signing in (public pages).
+7. An allowlisted organizer signs in with a magic link and creates/edits organization, series, events, and Event Codes.
 
 ## Non-goals (this spec)
 
@@ -31,7 +33,7 @@ EventSync is a public website and installable PWA for racers and spectators at a
 - Server-side rendering / Next.js / custom Express backend
 - Offline-first sync of live timing
 - Admin UI linked from the public header (admin is a hidden URL only)
-- Race order / announcements page (phase 7 — specified as FUTURE)
+- Announcements attached to Race Order (phase 7 — FUTURE)
 - Live stream grid (phase 7 — specified as FUTURE)
 
 ## Access model

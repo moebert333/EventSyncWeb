@@ -1,8 +1,11 @@
 import { createContext, useContext } from 'react'
 import type { StoredEventContext } from './eventContext'
+import type { StoredSelectedParticipant } from './selectedParticipant'
 
 export type EventCodeApi = {
   context: StoredEventContext | null
+  selectedParticipant: StoredSelectedParticipant | null
+  setSelectedParticipant: (participant: StoredSelectedParticipant | null) => void
   error: string | null
   resolving: boolean
   submitCode: (raw: string) => Promise<boolean>
