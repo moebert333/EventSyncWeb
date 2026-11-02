@@ -278,29 +278,44 @@ export function ProgressTrackingChart({ riderLabel, points }: Props) {
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            className="inline-flex cursor-pointer flex-wrap items-center gap-4"
-            aria-expanded={false}
-            aria-label="Choose chart axes"
-            title="Choose chart left and right axes"
-            onClick={openAxes}
-          >
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-block h-0.5 w-6" style={{ background: LEFT_COLOR }} />
-              {left.label}
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-block h-0.5 w-6" style={{ background: RIGHT_COLOR }} />
-              {right.label}
-            </span>
-          </button>
+          <>
+            <button
+              type="button"
+              className="inline-flex cursor-pointer flex-wrap items-center gap-4"
+              aria-expanded={false}
+              aria-label="Choose chart axes"
+              title="Choose chart left and right axes"
+              onClick={openAxes}
+            >
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block h-0.5 w-6" style={{ background: LEFT_COLOR }} />
+                {left.label}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block h-0.5 w-6" style={{ background: RIGHT_COLOR }} />
+                {right.label}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="cursor-pointer bg-transparent p-0 font-semibold text-zinc-300 underline-offset-2 hover:text-white hover:underline"
+              aria-expanded={false}
+              aria-label="Chart axis settings"
+              title="Choose chart left and right axes"
+              onClick={openAxes}
+            >
+              Settings
+            </button>
+          </>
         )}
       </div>
       {ready ? (
         <ProgressPlot points={toPlotPoints(points, savedLeft, savedRight)} label={described} left={left} right={right} />
       ) : (
-        <p className="flex min-h-36 items-center justify-center text-center text-lg text-zinc-200">
+        <p
+          className="mt-2 flex items-center justify-center text-center text-base text-zinc-200"
+          style={{ height: HEIGHT / 2 }}
+        >
           Chart is Waiting for 2 Laps Data...
         </p>
       )}

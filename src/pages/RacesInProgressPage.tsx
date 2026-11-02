@@ -228,6 +228,15 @@ function highlightRow(
   return bestLapLeadRow(rows)
 }
 
+/**
+ * Survives /live remounts so chart vs video stays as left unless the race changes
+ * (or this is the first visit for the event).
+ */
+let rememberedPanelEventId: number | null = null
+let rememberedPanelRaceId: number | null | undefined = undefined
+let rememberedVideoOpen = false
+let rememberedChartOpen = false
+
 export function RacesInProgressPage() {
   const { context, selectedParticipant } = useEventCode()
   const raceQuery = useRaceInProgress(context?.eventId ?? null, context?.seriesId ?? null)
@@ -261,17 +270,31 @@ export function RacesInProgressPage() {
   const preferVideoForRaceRef = useRef(false)
 
   if (raceQuery.isSuccess && selectionRaceId !== raceId) {
+    const eventId = context?.eventId ?? null
+    const raceChanged =
+      rememberedPanelEventId !== eventId || rememberedPanelRaceId !== raceId
     const hasVideo = raceId != null && raceStatusVideoSrc(raceQuery.data?.status) != null
     setSelectionRaceId(raceId)
     setPickedClass(null)
     setAllClasses(false)
     setSort(PLACE_SORT)
     setSelectedKey(null)
-    setChartOpen(false)
     appliedParticipantRaceRef.current = null
-    // Open video on first land and whenever the shown race changes (when media exists).
-    preferVideoForRaceRef.current = hasVideo
-    setVideoOpen(hasVideo)
+    if (raceChanged) {
+      // First visit or a new active race → Video view when media exists.
+      preferVideoForRaceRef.current = hasVideo
+      setChartOpen(false)
+      setVideoOpen(hasVideo)
+      rememberedPanelEventId = eventId
+      rememberedPanelRaceId = raceId
+      rememberedChartOpen = false
+      rememberedVideoOpen = hasVideo
+    } else {
+      // Same race after leaving / returning → keep prior chart/video choice.
+      preferVideoForRaceRef.current = !rememberedChartOpen
+      setChartOpen(rememberedChartOpen)
+      setVideoOpen(rememberedVideoOpen)
+    }
   }
 
   if (
@@ -317,6 +340,13 @@ export function RacesInProgressPage() {
   useEffect(() => {
     appliedParticipantRaceRef.current = null
   }, [selectedParticipant?.participantId])
+
+  useEffect(() => {
+    if (selectionRaceId === undefined) return
+    rememberedPanelRaceId = selectionRaceId
+    rememberedVideoOpen = videoOpen
+    rememberedChartOpen = chartOpen
+  }, [selectionRaceId, videoOpen, chartOpen])
 
   const progress = raceId == null ? EMPTY_PROGRESS : recordLapProgress(raceId, timingRows)
 
@@ -449,34 +479,36 @@ export function RacesInProgressPage() {
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="font-display text-4xl font-extrabold uppercase">Race {race.race_num}</h1>
           <StatusPill status={race.status} />
-          <button
-            type="button"
-            className={`inline-flex h-11 w-11 cursor-pointer items-center justify-center border ${
-              chartOpen ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/30 bg-transparent text-white'
-            }`}
-            aria-label="Progress tracking chart"
-            title={chartOpen ? 'Hide progress chart' : 'Show progress chart'}
-            aria-pressed={chartOpen}
-            aria-controls="progress-chart"
-            onClick={toggleChart}
-          >
-            <ChartIcon />
-          </button>
-          {hasStatusVideo ? (
+          <div className="ml-auto flex items-center gap-3 pr-2">
             <button
               type="button"
               className={`inline-flex h-11 w-11 cursor-pointer items-center justify-center border ${
-                videoOpen ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/30 bg-transparent text-white'
+                chartOpen ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/30 bg-transparent text-white'
               }`}
-              aria-label="Race status video"
-              title={videoOpen ? 'Hide status video' : 'Show status video'}
-              aria-pressed={videoOpen}
-              aria-controls="race-status-video"
-              onClick={toggleVideo}
+              aria-label="Progress tracking chart"
+              title={chartOpen ? 'Hide progress chart' : 'Show progress chart'}
+              aria-pressed={chartOpen}
+              aria-controls="progress-chart"
+              onClick={toggleChart}
             >
-              <VideoIcon />
+              <ChartIcon />
             </button>
-          ) : null}
+            {hasStatusVideo ? (
+              <button
+                type="button"
+                className={`inline-flex h-11 w-11 cursor-pointer items-center justify-center border ${
+                  videoOpen ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/30 bg-transparent text-white'
+                }`}
+                aria-label="Race status video"
+                title={videoOpen ? 'Hide status video' : 'Show status video'}
+                aria-pressed={videoOpen}
+                aria-controls="race-status-video"
+                onClick={toggleVideo}
+              >
+                <VideoIcon />
+              </button>
+            ) : null}
+          </div>
         </div>
         <p className="mt-2 text-zinc-300">
           {race.session_name}

@@ -149,7 +149,10 @@ function RaceRow({
   const [open, setOpen] = useState(false)
   const labels: string[] = []
   if (race.completed) labels.push('Completed')
-  if (race.active) labels.push(race.status ?? 'Active')
+  if (race.active) {
+    // Exact status (Staging / Paused / …) only when the selected rider is in this race.
+    labels.push(isParticipantRace ? (race.status ?? 'Active') : 'Active')
+  }
   if (isParticipantRace) labels.push('Participant')
 
   function badgeClass(label: string): string {
