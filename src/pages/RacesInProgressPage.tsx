@@ -321,6 +321,10 @@ export function RacesInProgressPage() {
   }
 
   useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
+  useEffect(() => {
     if (!highlightMenuOpen) return
     const onPointerDown = (event: MouseEvent) => {
       if (highlightMenuRef.current?.contains(event.target as Node)) return
@@ -510,10 +514,31 @@ export function RacesInProgressPage() {
             ) : null}
           </div>
         </div>
-        <p className="mt-2 text-zinc-300">
-          {race.session_name}
-          {when ? ` · ${when}` : ''}
-        </p>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <p className="text-zinc-300">
+            {race.session_name}
+            {when ? ` · ${when}` : ''}
+          </p>
+          {videoOpen ? (
+            <button
+              type="button"
+              className="ml-auto mr-[20%] cursor-pointer bg-transparent p-0 text-sm font-normal text-[#f0d56a] underline underline-offset-2"
+              title="Hide status video"
+              onClick={() => setVideoOpen(false)}
+            >
+              Hide Video
+            </button>
+          ) : chartOpen ? (
+            <button
+              type="button"
+              className="ml-auto mr-[20%] cursor-pointer bg-transparent p-0 text-sm font-normal text-[#f0d56a] underline underline-offset-2"
+              title="Hide progress chart"
+              onClick={() => setChartOpen(false)}
+            >
+              Hide Chart
+            </button>
+          ) : null}
+        </div>
         {race.event_id !== context.eventId ? (
           <p className="mt-2 text-sm text-zinc-400">Showing the live race for this series.</p>
         ) : null}

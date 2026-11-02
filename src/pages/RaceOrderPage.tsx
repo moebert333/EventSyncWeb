@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { useEffect, useState, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { EventParticipantHeader } from '../components/EventParticipantHeader'
 import { Skeleton } from '../components/Skeleton'
 import { statusToneClass } from '../components/StatusPill'
@@ -9,7 +10,7 @@ import {
   useEventRaceOrder,
   useParticipantRaceNums,
 } from '../hooks/useEventRaceOrder'
-import { riderName } from '../lib/format'
+import { formatSessionName, riderName, sessionsShareCommonPrefix } from '../lib/format'
 import type { EntryParticipant, EventRaceOrderClass, EventRaceOrderRow } from '../types/database'
 
 /** Fallback when sticky bars cannot be measured yet. */
@@ -33,14 +34,24 @@ function scrollRaceIntoView(raceId: number) {
   window.scrollBy({ top: delta, behavior: 'smooth' })
 }
 
-function raceTone(race: EventRaceOrderRow, isParticipantRace: boolean): string {
+function raceTone(
+  race: EventRaceOrderRow,
+  isParticipantRace: boolean,
+  activeRaceNum: number | null,
+): string {
   if (race.active) return 'border-green-500 bg-green-500/15'
-  if (isParticipantRace) return 'border-sky-400 bg-sky-400/15'
+  if (isParticipantRace) {
+    // Past participant races: light grey fill, same outline as non-participant races.
+    // Upcoming: light blue fill with blue outline.
+    const beforeActive = activeRaceNum != null && race.race_num < activeRaceNum
+    if (beforeActive) return 'border-white/15 bg-zinc-400/25'
+    return 'border-sky-400 bg-sky-400/15'
+  }
   if (race.completed) return 'border-zinc-600 bg-zinc-800/80'
   return 'border-white/15 bg-[#1a1a1a]'
 }
 
-function ClassRow({
+function ClassParticipants({
   eventId,
   raceClass,
 }: {
@@ -48,92 +59,117 @@ function ClassRow({
   raceClass: EventRaceOrderClass
 }) {
   const { selectedParticipant, setSelectedParticipant } = useEventCode()
-  const [open, setOpen] = useState(false)
-  const ridersQuery = useClassParticipants(open ? eventId : null, open ? raceClass.class_id : null)
+  const ridersQuery = useClassParticipants(eventId, raceClass.class_id)
+  const [pendingRider, setPendingRider] = useState<EntryParticipant | null>(null)
 
   const selectedForEvent =
     selectedParticipant?.eventId === eventId ? selectedParticipant : null
 
-  function chooseRider(rider: EntryParticipant) {
-    setSelectedParticipant({
-      eventId,
-      participantId: rider.participant_id,
-      firstName: rider.first_name,
-      lastName: rider.last_name,
-      participantPlate: rider.participant_plate,
-    })
+  function requestChooseRider(rider: EntryParticipant) {
+    if (selectedForEvent?.participantId === rider.participant_id) return
+    setPendingRider(rider)
   }
 
+  function confirmChooseRider() {
+    if (!pendingRider) return
+    setSelectedParticipant({
+      eventId,
+      participantId: pendingRider.participant_id,
+      firstName: pendingRider.first_name,
+      lastName: pendingRider.last_name,
+      participantPlate: pendingRider.participant_plate,
+    })
+    setPendingRider(null)
+  }
+
+  const pendingName = pendingRider
+    ? riderName(pendingRider.first_name, pendingRider.last_name)
+    : ''
+
   return (
-    <li>
-      <button
-        type="button"
-        className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 bg-transparent px-0 py-1.5 text-left text-sm font-semibold text-[#f5c518] underline underline-offset-2"
-        aria-expanded={open}
-        title={open ? `Hide riders in ${raceClass.class_name}` : `Show riders in ${raceClass.class_name}`}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span>{raceClass.class_name}</span>
-        <span className="shrink-0 no-underline" aria-hidden="true">
-          {open ? '▲' : '▼'}
-        </span>
-      </button>
-      {open ? (
-        <div className="mb-2 border border-white/10 bg-black/20 px-2 py-2">
-          {ridersQuery.isLoading ? <p className="text-sm text-zinc-400">Loading riders…</p> : null}
-          {ridersQuery.error ? (
-            <div role="alert">
-              <p className="text-sm text-red-400">
-                {ridersQuery.error instanceof Error ? ridersQuery.error.message : 'Could not load riders.'}
-              </p>
-              <button
-                type="button"
-                className="btn btn-ghost mt-2"
-                title="Retry loading riders"
-                onClick={() => void ridersQuery.refetch()}
-              >
-                Retry
-              </button>
-            </div>
-          ) : null}
-          {ridersQuery.isSuccess && (ridersQuery.data?.length ?? 0) === 0 ? (
-            <p className="text-sm text-zinc-400">No riders entered in this class.</p>
-          ) : null}
-          {(ridersQuery.data?.length ?? 0) > 0 ? (
-            <ul className="space-y-0.5">
-              {ridersQuery.data!.map((rider) => {
-                const selected = selectedForEvent?.participantId === rider.participant_id
-                return (
-                  <li key={rider.participant_id}>
-                    <button
-                      type="button"
-                      className={`block w-full cursor-pointer px-2 py-1.5 text-left text-sm ${
-                        selected
-                          ? 'bg-[#f5c518] font-bold text-black'
-                          : 'bg-transparent text-white hover:bg-white/10'
-                      }`}
-                      title={`Select ${riderName(rider.first_name, rider.last_name)}`}
-                      onClick={() => chooseRider(rider)}
-                    >
-                      {riderName(rider.first_name, rider.last_name)}
-                      {rider.participant_plate ? ` · ${rider.participant_plate}` : ''}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          ) : null}
+    <div className="border-t border-white/10 px-3 py-2">
+      <p className="text-sm font-semibold text-[#f5c518]">{raceClass.class_name}</p>
+      {ridersQuery.isLoading ? <p className="mt-1 text-sm text-zinc-400">Loading riders…</p> : null}
+      {ridersQuery.error ? (
+        <div className="mt-1" role="alert">
+          <p className="text-sm text-red-400">
+            {ridersQuery.error instanceof Error ? ridersQuery.error.message : 'Could not load riders.'}
+          </p>
           <button
             type="button"
-            className="mt-2 text-xs font-semibold uppercase tracking-wide text-zinc-400 underline underline-offset-2"
-            title={`Hide riders in ${raceClass.class_name}`}
-            onClick={() => setOpen(false)}
+            className="btn btn-ghost mt-2"
+            title="Retry loading riders"
+            onClick={() => void ridersQuery.refetch()}
           >
-            Collapse
+            Retry
           </button>
         </div>
       ) : null}
-    </li>
+      {ridersQuery.isSuccess && (ridersQuery.data?.length ?? 0) === 0 ? (
+        <p className="mt-1 text-sm text-zinc-400">No riders entered in this class.</p>
+      ) : null}
+      {(ridersQuery.data?.length ?? 0) > 0 ? (
+        <ul className="mt-1 space-y-0.5">
+          {ridersQuery.data!.map((rider) => {
+            const selected = selectedForEvent?.participantId === rider.participant_id
+            return (
+              <li key={rider.participant_id}>
+                <button
+                  type="button"
+                  className={`block w-full cursor-pointer px-2 py-1.5 text-left text-sm ${
+                    selected
+                      ? 'bg-[#f5c518] font-bold text-black'
+                      : 'bg-transparent text-white hover:bg-white/10'
+                  }`}
+                  title={`Select ${riderName(rider.first_name, rider.last_name)}`}
+                  onClick={() => requestChooseRider(rider)}
+                >
+                  {riderName(rider.first_name, rider.last_name)}
+                  {rider.participant_plate ? ` · ${rider.participant_plate}` : ''}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+      {pendingRider
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 py-20"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Confirm participant"
+            >
+              <div className="grid w-full max-w-lg gap-4 border border-[#f5c518] bg-[#1a1a1a] p-4 shadow-lg">
+                <p className="text-base text-white">
+                  Select {pendingName}
+                  {pendingRider.participant_plate ? ` · ${pendingRider.participant_plate}` : ''} as
+                  your participant?
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn"
+                    title={`Confirm ${pendingName}`}
+                    onClick={confirmChooseRider}
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    title="Cancel participant selection"
+                    onClick={() => setPendingRider(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
   )
 }
 
@@ -141,19 +177,33 @@ function RaceRow({
   eventId,
   race,
   isParticipantRace,
+  activeRaceNum,
+  stripSessionPrefix,
 }: {
   eventId: number
   race: EventRaceOrderRow
   isParticipantRace: boolean
+  activeRaceNum: number | null
+  stripSessionPrefix: boolean
 }) {
-  const [open, setOpen] = useState(false)
+  const [openClassIds, setOpenClassIds] = useState<number[]>([])
+  // Order: Participant, Completed, then Active / exact status.
   const labels: string[] = []
+  if (isParticipantRace) labels.push('Participant')
   if (race.completed) labels.push('Completed')
   if (race.active) {
     // Exact status (Staging / Paused / …) only when the selected rider is in this race.
     labels.push(isParticipantRace ? (race.status ?? 'Active') : 'Active')
   }
-  if (isParticipantRace) labels.push('Participant')
+
+  const raceNumberLabel = `Race ${race.race_num}`
+  const raceName = race.race_name?.trim() ?? ''
+  const raceTitle =
+    raceName && raceName.localeCompare(raceNumberLabel, undefined, { sensitivity: 'accent' }) !== 0
+      ? `${raceNumberLabel} · ${raceName}`
+      : raceNumberLabel
+  const sessionLabel = formatSessionName(race.session_name, stripSessionPrefix)
+  const openClasses = race.classes.filter((raceClass) => openClassIds.includes(raceClass.class_id))
 
   function badgeClass(label: string): string {
     if (statusToneClass[label]) return statusToneClass[label]
@@ -161,54 +211,86 @@ function RaceRow({
     return 'bg-zinc-600 text-white'
   }
 
+  function toggleClass(classId: number) {
+    setOpenClassIds((current) =>
+      current.includes(classId) ? current.filter((id) => id !== classId) : [...current, classId],
+    )
+  }
+
+  function onRowBackgroundClick(event: MouseEvent<HTMLLIElement>) {
+    const target = event.target
+    if (!(target instanceof Element)) return
+    // Keep class toggles, View Race, and rider selection working.
+    if (target.closest('a, button')) return
+    if (race.classes.length === 0) return
+    if (openClassIds.length > 0) {
+      setOpenClassIds([])
+      return
+    }
+    setOpenClassIds(race.classes.map((raceClass) => raceClass.class_id))
+  }
+
   return (
     <li
       id={`race-order-${race.race_id}`}
-      className={`border ${RACE_SCROLL_MARGIN} ${raceTone(race, isParticipantRace)}`}
+      className={`cursor-pointer border ${RACE_SCROLL_MARGIN} ${raceTone(race, isParticipantRace, activeRaceNum)}`}
+      onClick={onRowBackgroundClick}
     >
-      <button
-        type="button"
-        className="flex min-h-11 w-full cursor-pointer items-start justify-between gap-3 bg-transparent px-3 py-2 text-left"
-        aria-expanded={open}
-        title={open ? 'Hide classes for this race' : 'Show classes for this race'}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className="min-w-0">
-          <span className="font-display text-xl font-bold uppercase">
-            Race {race.race_num}
-            {race.race_name ? ` · ${race.race_name}` : ''}
-          </span>
-          {race.session_name || labels.length > 0 ? (
-            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-              {race.session_name ? <span className="text-sm text-zinc-400">{race.session_name}</span> : null}
-              {labels.map((label) => (
-                <span
-                  key={label}
-                  className={`inline-flex px-2 py-0.5 text-xs font-bold uppercase ${badgeClass(label)}`}
-                >
-                  {label}
-                </span>
-              ))}
+      <div className="min-h-11 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="font-display text-xl font-bold uppercase">{raceTitle}</span>
+          {labels.map((label) => (
+            <span
+              key={label}
+              className={`inline-flex px-2 py-0.5 text-xs font-bold uppercase ${badgeClass(label)}`}
+            >
+              {label}
             </span>
+          ))}
+          {race.active ? (
+            <Link
+              to="/live"
+              className="text-sm font-normal text-[#f0d56a] underline underline-offset-2"
+              title="Go to the Active Race page"
+            >
+              View Race
+            </Link>
           ) : null}
-        </span>
-        <span className="shrink-0 text-[#f5c518]" aria-hidden="true">
-          {open ? '▲' : '▼'}
-        </span>
-      </button>
-      {open ? (
-        <div className="border-t border-white/10 px-3 py-2">
-          {race.classes.length === 0 ? (
-            <p className="text-sm text-zinc-400">No classes listed for this race.</p>
-          ) : (
-            <ul className="space-y-1">
-              {race.classes.map((raceClass) => (
-                <ClassRow key={raceClass.class_id} eventId={eventId} raceClass={raceClass} />
-              ))}
-            </ul>
-          )}
         </div>
-      ) : null}
+        {sessionLabel || race.classes.length > 0 ? (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm">
+            {sessionLabel ? <span className="text-zinc-400">{sessionLabel}:</span> : null}
+            {race.classes.length === 0 ? (
+              <span className="text-zinc-500">No classes listed</span>
+            ) : (
+              race.classes.map((raceClass, index) => {
+                const open = openClassIds.includes(raceClass.class_id)
+                return (
+                  <span key={raceClass.class_id} className="inline-flex items-center">
+                    {index > 0 ? <span className="mr-1 text-zinc-400">,</span> : null}
+                    <button
+                      type="button"
+                      className="cursor-pointer bg-transparent p-0 font-normal text-[#f0d56a] underline underline-offset-2"
+                      aria-expanded={open}
+                      title={
+                        open
+                          ? `Hide riders in ${raceClass.class_name}`
+                          : `Show riders in ${raceClass.class_name}`
+                      }
+                      onClick={() => toggleClass(raceClass.class_id)}
+                    >
+                      {raceClass.class_name}
+                    </button>
+                  </span>
+                )
+              })
+            )}
+          </div>
+        ) : null}
+      </div>
+      {openClasses.map((raceClass) => (
+        <ClassParticipants key={raceClass.class_id} eventId={eventId} raceClass={raceClass} />
+      ))}
     </li>
   )
 }
@@ -224,7 +306,9 @@ export function RaceOrderPage() {
   const participantRacesQuery = useParticipantRaceNums(context?.eventId ?? null, participantId)
 
   const races = racesQuery.data ?? []
-  const activeRaceId = races.find((race) => race.active)?.race_id ?? null
+  const activeRace = races.find((race) => race.active) ?? null
+  const activeRaceId = activeRace?.race_id ?? null
+  const activeRaceNum = activeRace?.race_num ?? null
 
   // Scroll on every visit to this page (location.key) and when the active race changes.
   useEffect(() => {
@@ -243,6 +327,7 @@ export function RaceOrderPage() {
   if (!context) return <Navigate to="/?needCode=1" replace />
 
   const participantRaceNums = new Set(participantRacesQuery.data ?? [])
+  const stripSessionPrefix = sessionsShareCommonPrefix(races.map((race) => race.session_name))
 
   return (
     <div className="space-y-5">
@@ -251,7 +336,7 @@ export function RaceOrderPage() {
         eventName={context.eventName}
         pageTitle={
           <>
-            Race Order (your races are highlighted in <span className="text-sky-400">Blue</span>)
+            Race Order (your races in <span className="text-sky-400">Blue</span>)
           </>
         }
       />
@@ -281,6 +366,8 @@ export function RaceOrderPage() {
               eventId={context.eventId}
               race={race}
               isParticipantRace={participantRaceNums.has(race.race_num)}
+              activeRaceNum={activeRaceNum}
+              stripSessionPrefix={stripSessionPrefix}
             />
           ))}
         </ul>

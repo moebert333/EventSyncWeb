@@ -7,10 +7,31 @@ import {
   useParticipantRaceNums,
 } from '../hooks/useEventRaceOrder'
 import { riderName } from '../lib/format'
+import type { EventRaceOrderRow } from '../types/database'
 import { SelectParticipantBox } from './SelectParticipantBox'
 
 /** Site header (safe area + bar) so this strip sticks just under it. */
 const STICKY_TOP = 'top-[calc(3.75rem+env(safe-area-inset-top,0px))]'
+
+type RaceProgressLine =
+  | { kind: 'first'; raceNum: number }
+  | { kind: 'active'; activeNum: number; nextNum: number }
+
+/** Line 3: active + next participant race, or first race when nothing is active. */
+function raceProgressLine(
+  races: EventRaceOrderRow[],
+  participantRaceNums: number[],
+): RaceProgressLine | null {
+  if (participantRaceNums.length === 0) return null
+  const sorted = participantRaceNums.slice().sort((a, b) => a - b)
+  const activeRace = races.find((race) => race.active)
+  if (!activeRace) {
+    return { kind: 'first', raceNum: sorted[0]! }
+  }
+  const nextNum = sorted.find((num) => num >= activeRace.race_num)
+  if (nextNum == null) return null
+  return { kind: 'active', activeNum: activeRace.race_num, nextNum }
+}
 
 type EventParticipantHeaderProps = {
   eventId: number
@@ -44,6 +65,10 @@ export function EventParticipantHeader({
       : null
   const activeRaceStatus =
     stagingIn === 0 ? (racesQuery.data?.find((race) => race.active)?.status ?? null) : null
+  const progressLine =
+    selectedForEvent && racesQuery.data && participantRacesQuery.data
+      ? raceProgressLine(racesQuery.data, participantRacesQuery.data)
+      : null
 
   const participantLabel = selectedForEvent
     ? `${riderName(selectedForEvent.firstName, selectedForEvent.lastName)}${
@@ -91,6 +116,18 @@ export function EventParticipantHeader({
             {stagingLabel != null ? <span className={stagingClass}>{stagingLabel}</span> : null}
           </span>
         </p>
+        {progressLine ? (
+          <p className="text-lg font-semibold leading-tight text-zinc-300">
+            {progressLine.kind === 'first' ? (
+              <>Your first race is number {progressLine.raceNum}.</>
+            ) : (
+              <>
+                <span className="text-zinc-400">Active Race:</span> {progressLine.activeNum}, your
+                next race is number {progressLine.nextNum}
+              </>
+            )}
+          </p>
+        ) : null}
         {picking ? (
           <SelectParticipantBox eventId={eventId} onOk={finishPick} onSkip={finishPick} />
         ) : null}

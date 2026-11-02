@@ -75,3 +75,37 @@ export function bestLapLabel(lapNum: number | null, lapTime: string | null): str
   if (lapNum == null || lapNum === 0) return time
   return `#${lapNum} - ${time}`
 }
+
+/** Everything before the last `::` segment, or null when the name has no separator. */
+function sessionNamePrefix(session: string): string | null {
+  const parts = session.split('::')
+  if (parts.length < 2) return null
+  return parts.slice(0, -1).join('::')
+}
+
+/**
+ * True when every non-empty session uses `::` and shares the same prefix
+ * (e.g. all are `DIV::1::MOTO*`).
+ */
+export function sessionsShareCommonPrefix(sessions: (string | null | undefined)[]): boolean {
+  const values = sessions.map((session) => session?.trim() ?? '').filter((session) => session !== '')
+  if (values.length === 0) return false
+  const prefixes = values.map(sessionNamePrefix)
+  const first = prefixes[0]
+  if (first == null) return false
+  return prefixes.every((prefix) => prefix === first)
+}
+
+/** When prefixes are shared across rows, keep only the last `::` segment. */
+export function formatSessionName(
+  session: string | null | undefined,
+  stripSharedPrefix: boolean,
+): string | null {
+  if (session == null) return null
+  const trimmed = session.trim()
+  if (!trimmed) return null
+  if (!stripSharedPrefix) return trimmed
+  const parts = trimmed.split('::')
+  if (parts.length < 2) return trimmed
+  return parts[parts.length - 1] || trimmed
+}
