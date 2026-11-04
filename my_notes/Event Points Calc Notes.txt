@@ -1,0 +1,12 @@
+Calculating event points:
+
+Using the table event_results, filtering the set of records for a specific event and class,  calculate the final points if overall_points is not provided.  
+
+First read the event_points table to get the event points records for each finish position. When doing this also save the status. Also save the point value for a finish position with status DNS. 
+
+First determine for this class the races that have finish positions, this will be by checking for each race in order from field race1_finish to race#_finish, any have a Non-Null value in the race#_finish in any row will be used.  This set of races will be the races used to calculate overall points and overall finish position.
+
+To calculate finish positions add up the finish positions from race 1, 2 and 3 for each participant in that class. Then number them in order using this total with the smallest number being 1 and incrementing by 1 for each position in order. Any ties in value, the one with the lowest number position in the last valid (non-null) race in race number order will be ordered before a higher number position.  If any finish positions are encountered for a race that are Null, assume the position value is the value of DNS for adding points.
+
+Once finish positions are determined for each participant in the class, use the event_points table to assign overall_position ad overall_points for each event_results record for this class.
+ 

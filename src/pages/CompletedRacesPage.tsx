@@ -207,12 +207,10 @@ export function CompletedRacesPage() {
       ) : null}
 
       {!loading && !loadError && !waitingForAutoApply ? (
-        <section className={`panel ${selectOpen ? '' : '!py-1.5'}`}>
+        <section className={`panel !bg-[#2a2a2a] ${selectOpen ? '!py-2' : '!py-1.5'}`}>
           <button
             type="button"
-            className={`flex w-full cursor-pointer items-center justify-between gap-3 bg-transparent p-0 text-left ${
-              selectOpen ? 'min-h-11' : 'min-h-0 py-0.5'
-            }`}
+            className="flex w-full min-h-0 cursor-pointer items-center justify-between gap-3 bg-transparent p-0 py-0.5 text-left"
             aria-expanded={selectOpen}
             aria-controls="completed-races-select"
             title={selectOpen ? 'Collapse results filter' : 'Expand results filter'}
@@ -227,20 +225,20 @@ export function CompletedRacesPage() {
           {selectOpen ? (
             <form
               id="completed-races-select"
-              className="mt-4 grid gap-4"
+              className="mt-2 grid gap-2"
               onSubmit={(event) => {
                 event.preventDefault()
                 showResults()
               }}
             >
-              <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="text-sm uppercase tracking-wide text-zinc-400">Organization</span>
-                <span className="text-lg">{context.organizationName}</span>
+              <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-400">Organization</span>
+                <span className="text-base font-semibold">{context.organizationName}</span>
               </p>
-              <label className="block text-sm uppercase tracking-wide text-zinc-400">
-                Series
+              <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm uppercase tracking-wide text-zinc-400">
+                <span className="shrink-0">Series</span>
                 <select
-                  className="control mt-1"
+                  className="control min-w-0 flex-1"
                   title="Filter events by series"
                   value={seriesFilter === 'all' ? 'all' : String(seriesFilter)}
                   onChange={(event) => onSeriesChange(event.target.value)}
@@ -253,10 +251,10 @@ export function CompletedRacesPage() {
                   ))}
                 </select>
               </label>
-              <label className="block text-sm uppercase tracking-wide text-zinc-400">
-                Event
+              <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm uppercase tracking-wide text-zinc-400">
+                <span className="shrink-0">Event</span>
                 <select
-                  className="control mt-1"
+                  className="control min-w-0 flex-1"
                   title="Choose which event’s results to show"
                   value={selectedEventId ?? ''}
                   onChange={(event) => {
@@ -276,9 +274,13 @@ export function CompletedRacesPage() {
                 </select>
               </label>
 
-              <fieldset className="flex flex-wrap gap-4">
-                <legend className="text-sm uppercase tracking-wide text-zinc-400">Filter by</legend>
-                <label className="inline-flex min-h-11 items-center gap-2" title="Filter results by class">
+              <div
+                className="flex flex-wrap items-center gap-x-4 gap-y-1"
+                role="radiogroup"
+                aria-label="Filter by"
+              >
+                <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-400">Filter by</span>
+                <label className="inline-flex items-center gap-2" title="Filter results by class">
                   <input
                     type="radio"
                     name="result-mode"
@@ -290,7 +292,7 @@ export function CompletedRacesPage() {
                   />
                   Class
                 </label>
-                <label className="inline-flex min-h-11 items-center gap-2" title="Filter results by participant">
+                <label className="inline-flex items-center gap-2" title="Filter results by participant">
                   <input
                     type="radio"
                     name="result-mode"
@@ -302,13 +304,13 @@ export function CompletedRacesPage() {
                   />
                   Participant
                 </label>
-              </fieldset>
+              </div>
 
               {mode === 'class' ? (
-                <label className="block text-sm uppercase tracking-wide text-zinc-400">
-                  Class
+                <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm uppercase tracking-wide text-zinc-400">
+                  <span className="shrink-0">Class</span>
                   <select
-                    className="control mt-1"
+                    className="control min-w-0 flex-1"
                     title="Choose a class"
                     value={className}
                     onChange={(event) => setClassName(event.target.value)}
@@ -323,19 +325,19 @@ export function CompletedRacesPage() {
                 </label>
               ) : (
                 <div className="grid gap-2">
-                  <label className="block text-sm uppercase tracking-wide text-zinc-400">
-                    Search name or plate
+                  <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm uppercase tracking-wide text-zinc-400">
+                    <span className="shrink-0">Search name or plate</span>
                     <input
-                      className="control mt-1"
+                      className="control min-w-0 flex-1"
                       title="Filter riders by name or plate"
                       value={riderSearch}
                       onChange={(event) => setRiderSearch(event.target.value)}
                     />
                   </label>
-                  <label className="block text-sm uppercase tracking-wide text-zinc-400">
-                    Participant
+                  <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm uppercase tracking-wide text-zinc-400">
+                    <span className="shrink-0">Participant</span>
                     <select
-                      className="control mt-1"
+                      className="control min-w-0 flex-1"
                       title="Choose a rider"
                       value={participantId}
                       onChange={(event) =>

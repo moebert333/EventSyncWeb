@@ -25,7 +25,7 @@ function isStandalone(): boolean {
 export function HomePage() {
   const navigate = useNavigate()
   const { context, error, resolving, submitCode } = useEventCode()
-  const raceQuery = useRaceInProgress(context?.eventId ?? null, context?.seriesId ?? null)
+  const raceQuery = useRaceInProgress(context?.eventId ?? null)
   const [params] = useSearchParams()
   const [draft, setDraft] = useState('')
   const [promptParticipant, setPromptParticipant] = useState(false)
@@ -42,6 +42,10 @@ export function HomePage() {
       if (ok) setPromptParticipant(true)
     })
   }, [codeParam, submitCode])
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
 
   useEffect(() => {
     if (needCode) inputRef.current?.focus()

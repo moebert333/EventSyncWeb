@@ -1,37 +1,17 @@
 import { useState, type ReactNode } from 'react'
 import { useEventCode } from '../hooks/useEventCode'
 import {
+  raceProgressLine,
   stagingInRaces,
   stagingLabelText,
   useEventRaceOrder,
   useParticipantRaceNums,
 } from '../hooks/useEventRaceOrder'
 import { riderName } from '../lib/format'
-import type { EventRaceOrderRow } from '../types/database'
 import { SelectParticipantBox } from './SelectParticipantBox'
 
 /** Site header (safe area + bar) so this strip sticks just under it. */
 const STICKY_TOP = 'top-[calc(3.75rem+env(safe-area-inset-top,0px))]'
-
-type RaceProgressLine =
-  | { kind: 'first'; raceNum: number }
-  | { kind: 'active'; activeNum: number; nextNum: number }
-
-/** Line 3: active + next participant race, or first race when nothing is active. */
-function raceProgressLine(
-  races: EventRaceOrderRow[],
-  participantRaceNums: number[],
-): RaceProgressLine | null {
-  if (participantRaceNums.length === 0) return null
-  const sorted = participantRaceNums.slice().sort((a, b) => a - b)
-  const activeRace = races.find((race) => race.active)
-  if (!activeRace) {
-    return { kind: 'first', raceNum: sorted[0]! }
-  }
-  const nextNum = sorted.find((num) => num >= activeRace.race_num)
-  if (nextNum == null) return null
-  return { kind: 'active', activeNum: activeRace.race_num, nextNum }
-}
 
 type EventParticipantHeaderProps = {
   eventId: number

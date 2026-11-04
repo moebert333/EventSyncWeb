@@ -91,6 +91,13 @@ a {
   border: 1px solid rgb(255 255 255 / 0.08);
 }
 
+/* Active Race: tall enough for sticky header + 25 body rows before inner scroll. */
+.table-wrap-live {
+  max-height: calc(
+    (0.7rem * 2 + 0.75rem * 1.2) + 25 * (0.65rem * 2 + 0.92rem * 1.2 + 1px)
+  );
+}
+
 table.data {
   width: 100%;
   border-collapse: collapse;

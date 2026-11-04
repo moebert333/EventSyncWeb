@@ -13,27 +13,18 @@ function isLive(status: RaceStatus | null | undefined): boolean {
   return status != null && LIVE.includes(status)
 }
 
-export function useRaceInProgress(eventId: number | null, seriesId: number | null) {
+export function useRaceInProgress(eventId: number | null) {
   return useQuery({
-    queryKey: ['race-in-progress', eventId, seriesId],
-    enabled: eventId != null && seriesId != null,
+    queryKey: ['race-in-progress', eventId],
+    enabled: eventId != null,
     queryFn: async (): Promise<RaceInProgress | null> => {
-      const byEvent = await supabase
+      const { data, error } = await supabase
         .from('race_in_progress')
         .select(RACE_COLUMNS)
         .eq('event_id', eventId!)
         .limit(1)
-      if (byEvent.error) throw byEvent.error
-      const eventRace = (byEvent.data?.[0] ?? null) as RaceInProgress | null
-      if (eventRace) return eventRace
-
-      const bySeries = await supabase
-        .from('race_in_progress')
-        .select(RACE_COLUMNS)
-        .eq('series_id', seriesId!)
-        .limit(1)
-      if (bySeries.error) throw bySeries.error
-      return (bySeries.data?.[0] ?? null) as RaceInProgress | null
+      if (error) throw error
+      return (data?.[0] ?? null) as RaceInProgress | null
     },
     // Always poll while an event is selected: empty → pick up a newly active race;
     // Finished → pick up the next Staging/Active race; live → keep header/status fresh.

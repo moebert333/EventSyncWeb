@@ -6,6 +6,8 @@ import { Skeleton } from '../components/Skeleton'
 import { statusToneClass } from '../components/StatusPill'
 import { useEventCode } from '../hooks/useEventCode'
 import {
+  raceProgressLine,
+  raceProgressMessage,
   useClassParticipants,
   useEventRaceOrder,
   useParticipantRaceNums,
@@ -222,12 +224,8 @@ function RaceRow({
     if (!(target instanceof Element)) return
     // Keep class toggles, View Race, and rider selection working.
     if (target.closest('a, button')) return
-    if (race.classes.length === 0) return
-    if (openClassIds.length > 0) {
-      setOpenClassIds([])
-      return
-    }
-    setOpenClassIds(race.classes.map((raceClass) => raceClass.class_id))
+    // Row click only collapses; class name buttons are the sole expand path.
+    if (openClassIds.length > 0) setOpenClassIds([])
   }
 
   return (
@@ -304,11 +302,46 @@ export function RaceOrderPage() {
       ? selectedParticipant.participantId
       : null
   const participantRacesQuery = useParticipantRaceNums(context?.eventId ?? null, participantId)
+  const [progressOpen, setProgressOpen] = useState(false)
+  const [progressShownFor, setProgressShownFor] = useState<string | null>(null)
 
   const races = racesQuery.data ?? []
   const activeRace = races.find((race) => race.active) ?? null
   const activeRaceId = activeRace?.race_id ?? null
   const activeRaceNum = activeRace?.race_num ?? null
+
+  const selectedForEvent =
+    selectedParticipant && context && selectedParticipant.eventId === context.eventId
+      ? selectedParticipant
+      : null
+  const progressLine =
+    selectedForEvent && racesQuery.data && participantRacesQuery.data
+      ? raceProgressLine(racesQuery.data, participantRacesQuery.data)
+      : null
+  const progressRaceText = progressLine ? raceProgressMessage(progressLine) : null
+  const progressName =
+    selectedForEvent && progressRaceText
+      ? riderName(selectedForEvent.firstName, selectedForEvent.lastName)
+      : null
+
+  // One toast per visit (location.key) + participant, once race data is ready.
+  const progressTriggerKey = participantId != null ? `${location.key}:${participantId}` : null
+
+  useEffect(() => {
+    if (progressTriggerKey == null || progressName == null || progressRaceText == null) {
+      setProgressOpen(false)
+      return
+    }
+    if (progressShownFor === progressTriggerKey) return
+    setProgressShownFor(progressTriggerKey)
+    setProgressOpen(true)
+  }, [progressTriggerKey, progressName, progressRaceText, progressShownFor])
+
+  useEffect(() => {
+    if (!progressOpen) return
+    const timer = window.setTimeout(() => setProgressOpen(false), 5000)
+    return () => window.clearTimeout(timer)
+  }, [progressOpen])
 
   // Scroll on every visit to this page (location.key) and when the active race changes.
   useEffect(() => {
@@ -372,6 +405,24 @@ export function RaceOrderPage() {
           ))}
         </ul>
       ) : null}
+
+      {progressOpen && progressName && progressRaceText
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-20"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${progressName}. ${progressRaceText}`}
+              onClick={() => setProgressOpen(false)}
+            >
+              <div className="max-w-lg border border-[#f5c518] bg-[#1a1a1a] px-5 py-3 text-center text-xl font-bold text-white shadow-lg">
+                <p>{progressName}</p>
+                <p className="mt-1 font-semibold text-zinc-200">{progressRaceText}</p>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }

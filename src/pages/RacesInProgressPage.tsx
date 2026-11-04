@@ -239,7 +239,7 @@ let rememberedChartOpen = false
 
 export function RacesInProgressPage() {
   const { context, selectedParticipant } = useEventCode()
-  const raceQuery = useRaceInProgress(context?.eventId ?? null, context?.seriesId ?? null)
+  const raceQuery = useRaceInProgress(context?.eventId ?? null)
   const live = raceQuery.data?.status != null && LIVE.includes(raceQuery.data.status)
   const timingQuery = useLiveTiming(raceQuery.data)
   const classQuery = useRaceClassNames(raceQuery.data?.race_id ?? null, live)
@@ -539,9 +539,6 @@ export function RacesInProgressPage() {
             </button>
           ) : null}
         </div>
-        {race.event_id !== context.eventId ? (
-          <p className="mt-2 text-sm text-zinc-400">Showing the live race for this series.</p>
-        ) : null}
         <RaceStatusVideo status={race.status} showVideo={videoOpen} />
         {chartOpen ? (
           <div id="progress-chart" className="mt-4">
@@ -658,7 +655,7 @@ export function RacesInProgressPage() {
           {visibleRows.length === 0 ? (
             <p className="panel mt-2">{showingAll ? 'No timing rows yet.' : 'No timing rows for this class yet.'}</p>
           ) : (
-            <div className="table-wrap mt-2">
+            <div className="table-wrap table-wrap-live mt-2">
               <table className="data">
                 <thead>
                   <tr>
@@ -694,18 +691,12 @@ export function RacesInProgressPage() {
                         className={className}
                         tabIndex={0}
                         aria-selected={selected}
-                        title={`Select ${riderName(row.first_name, row.last_name)} and show chart`}
-                        onClick={() => {
-                          setSelectedKey(key)
-                          setChartOpen(true)
-                          setVideoOpen(false)
-                        }}
+                        title={`Select ${riderName(row.first_name, row.last_name)} for the chart`}
+                        onClick={() => setSelectedKey(key)}
                         onKeyDown={(event) => {
                           if (event.key !== 'Enter' && event.key !== ' ') return
                           event.preventDefault()
                           setSelectedKey(key)
-                          setChartOpen(true)
-                          setVideoOpen(false)
                         }}
                       >
                         {tableColumns.map((column) => (

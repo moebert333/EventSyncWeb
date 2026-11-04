@@ -164,6 +164,31 @@ export function useParticipantRaceNums(eventId: number | null, participantId: nu
   })
 }
 
+export type RaceProgressLine =
+  | { kind: 'first'; raceNum: number }
+  | { kind: 'active'; activeNum: number; nextNum: number }
+
+/** Active + next participant race, or first race when nothing is active. */
+export function raceProgressLine(
+  races: EventRaceOrderRow[],
+  participantRaceNums: number[],
+): RaceProgressLine | null {
+  if (participantRaceNums.length === 0) return null
+  const sorted = participantRaceNums.slice().sort((a, b) => a - b)
+  const activeRace = races.find((race) => race.active)
+  if (!activeRace) {
+    return { kind: 'first', raceNum: sorted[0]! }
+  }
+  const nextNum = sorted.find((num) => num >= activeRace.race_num)
+  if (nextNum == null) return null
+  return { kind: 'active', activeNum: activeRace.race_num, nextNum }
+}
+
+export function raceProgressMessage(line: RaceProgressLine): string {
+  if (line.kind === 'first') return `Your first race is number ${line.raceNum}.`
+  return `Active Race: ${line.activeNum}, your next race is number ${line.nextNum}`
+}
+
 /**
  * Races from the current active race up to the participant's next race (by race_num).
  * Requires a race with `active` (Staging / Active / Paused / Finished until the next activates).
