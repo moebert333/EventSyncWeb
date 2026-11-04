@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { useEventCode } from '../hooks/useEventCode'
 import {
   raceProgressLine,
+  raceProgressMessage,
   stagingInRaces,
   stagingLabelText,
   useEventRaceOrder,
@@ -49,6 +50,8 @@ export function EventParticipantHeader({
     selectedForEvent && racesQuery.data && participantRacesQuery.data
       ? raceProgressLine(racesQuery.data, participantRacesQuery.data)
       : null
+  const progressMessage = progressLine ? raceProgressMessage(progressLine) : null
+  const progressActivePrefix = 'Active Race:'
 
   const participantLabel = selectedForEvent
     ? `${riderName(selectedForEvent.firstName, selectedForEvent.lastName)}${
@@ -61,7 +64,7 @@ export function EventParticipantHeader({
     onParticipantChanged?.()
   }
 
-  const stagingFlash = stagingIn === 0 || stagingIn === 1
+  const stagingFlash = stagingIn === 0 || stagingIn === 1 || stagingIn === 'inThisRace'
   const stagingClass = stagingFlash
     ? 'staging-flash px-2 py-0.5 font-bold text-black'
     : stagingIn === 2
@@ -96,15 +99,15 @@ export function EventParticipantHeader({
             {stagingLabel != null ? <span className={stagingClass}>{stagingLabel}</span> : null}
           </span>
         </p>
-        {progressLine ? (
+        {progressMessage ? (
           <p className="text-lg font-semibold leading-tight text-zinc-300">
-            {progressLine.kind === 'first' ? (
-              <>Your first race is number {progressLine.raceNum}.</>
-            ) : (
+            {progressMessage.startsWith(progressActivePrefix) ? (
               <>
-                <span className="text-zinc-400">Active Race:</span> {progressLine.activeNum}, your
-                next race is number {progressLine.nextNum}
+                <span className="text-zinc-400">{progressActivePrefix}</span>
+                {progressMessage.slice(progressActivePrefix.length)}
               </>
+            ) : (
+              progressMessage
             )}
           </p>
         ) : null}

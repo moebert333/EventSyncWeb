@@ -7,6 +7,18 @@ export type ResultsFilter = {
   eventId: number
   className: string | null
   participantId: number | null
+  raceId: number | null
+}
+
+export type EventRaceOption = {
+  race_id: number
+  race_num: number
+  race_name: string | null
+}
+
+export function raceOptionLabel(race: EventRaceOption): string {
+  const name = race.race_name?.trim()
+  return name || `Race ${race.race_num}`
 }
 
 const RESULT_COLUMNS =
@@ -84,29 +96,18 @@ export function useEventParticipants(eventId: number | null) {
   })
 }
 
-/** Class names the participant is entered in for an event, sorted by name. */
-export function useParticipantEventClasses(eventId: number | null, participantId: number | null) {
+export function useEventRaces(eventId: number | null) {
   return useQuery({
-    queryKey: ['participant-event-classes', eventId, participantId],
-    enabled: eventId != null && participantId != null,
-    queryFn: async (): Promise<string[]> => {
+    queryKey: ['event-races-results', eventId],
+    enabled: eventId != null,
+    queryFn: async (): Promise<EventRaceOption[]> => {
       const { data, error } = await supabase
-        .from('event_entry')
-        .select('classes(class_name)')
+        .from('races')
+        .select('race_id, race_num, race_name')
         .eq('event_id', eventId!)
-        .eq('participant_id', participantId!)
+        .order('race_num')
       if (error) throw error
-      const names: string[] = []
-      const seen = new Set<string>()
-      for (const row of data ?? []) {
-        const related = (row as { classes: { class_name: string } | { class_name: string }[] | null }).classes
-        const className = Array.isArray(related) ? related[0]?.class_name : related?.class_name
-        if (!className || seen.has(className)) continue
-        seen.add(className)
-        names.push(className)
-      }
-      names.sort((a, b) => a.localeCompare(b))
-      return names
+      return (data ?? []) as EventRaceOption[]
     },
   })
 }
@@ -117,8 +118,46 @@ export function useEventResults(filter: ResultsFilter | null) {
     enabled: filter != null,
     queryFn: async (): Promise<EventClassResult[]> => {
       let query = supabase.from('event_class_results').select(RESULT_COLUMNS).eq('event_id', filter!.eventId)
-      if (filter!.className) query = query.eq('class_name', filter!.className)
-      if (filter!.participantId != null) query = query.eq('participant_id', filter!.participantId)
+      if (filter!.className) {
+        query = query.eq('class_name', filter!.className)
+      } else if (filter!.participantId != null) {
+        // Full standings for every class this participant is entered in / has results in.
+        const [entryResult, resultClasses] = await Promise.all([
+          supabase
+            .from('event_entry')
+            .select('class_id')
+            .eq('event_id', filter!.eventId)
+            .eq('participant_id', filter!.participantId),
+          supabase
+            .from('event_class_results')
+            .select('class_id')
+            .eq('event_id', filter!.eventId)
+            .eq('participant_id', filter!.participantId),
+        ])
+        if (entryResult.error) throw entryResult.error
+        if (resultClasses.error) throw resultClasses.error
+        const classIds = [
+          ...new Set(
+            [
+              ...((entryResult.data ?? []) as { class_id: number }[]),
+              ...((resultClasses.data ?? []) as { class_id: number }[]),
+            ].map((row) => row.class_id),
+          ),
+        ]
+        if (classIds.length === 0) return []
+        query = query.in('class_id', classIds)
+      } else if (filter!.raceId != null) {
+        const { data: raceClasses, error: raceClassError } = await supabase
+          .from('race_class_names')
+          .select('class_id')
+          .eq('race_id', filter!.raceId)
+        if (raceClassError) throw raceClassError
+        const classIds = [
+          ...new Set(((raceClasses ?? []) as { class_id: number }[]).map((row) => row.class_id)),
+        ]
+        if (classIds.length === 0) return []
+        query = query.in('class_id', classIds)
+      }
       const { data, error } = await query
       if (error) throw error
       const rows = (data ?? []) as EventClassResult[]

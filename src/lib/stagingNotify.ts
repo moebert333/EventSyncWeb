@@ -3,7 +3,10 @@ function canNotify(): boolean {
 }
 
 /** Request permission on first need, then show an OS/browser notification if allowed. */
-export async function notifyStaging(message: string, urgent: 0 | 1 | 2): Promise<void> {
+export async function notifyStaging(
+  message: string,
+  urgent: 0 | 1 | 2 | 'inThisRace',
+): Promise<void> {
   if (!canNotify()) return
 
   let permission = Notification.permission

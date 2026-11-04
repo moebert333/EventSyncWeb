@@ -58,6 +58,8 @@ type PlotPoint = {
 type Props = {
   riderLabel: string
   points: LapProgressPoint[]
+  /** Prefer X-axis ticks through this lap (e.g. rider current lap), even if a sample is missing. */
+  throughLap?: number | null
 }
 
 export function ChartIcon() {
@@ -187,7 +189,7 @@ function AxisSelect({
   )
 }
 
-export function ProgressTrackingChart({ riderLabel, points }: Props) {
+export function ProgressTrackingChart({ riderLabel, points, throughLap }: Props) {
   const labelId = useId()
   const legendRef = useRef<HTMLDivElement>(null)
   const ignoreOutsideRef = useRef(false)
@@ -310,7 +312,13 @@ export function ProgressTrackingChart({ riderLabel, points }: Props) {
         )}
       </div>
       {ready ? (
-        <ProgressPlot points={toPlotPoints(points, savedLeft, savedRight)} label={described} left={left} right={right} />
+        <ProgressPlot
+          points={toPlotPoints(points, savedLeft, savedRight)}
+          label={described}
+          left={left}
+          right={right}
+          throughLap={throughLap}
+        />
       ) : (
         <p
           className="mt-2 flex items-center justify-center text-center text-base text-zinc-200"
@@ -406,11 +414,13 @@ function ProgressPlot({
   label,
   left,
   right,
+  throughLap,
 }: {
   points: PlotPoint[]
   label: string
   left: Metric
   right: Metric
+  throughLap?: number | null
 }) {
   const [width, setWidth] = useState(0)
   const [element, setElement] = useState<HTMLDivElement | null>(null)
@@ -439,22 +449,24 @@ function ProgressPlot({
   const innerH = HEIGHT - pad.top - pad.bottom
   const top = pad.top
   const bottom = pad.top + innerH
-  const laps = points.map((point) => point.lap)
-  const xMinIndex = 0
-  const xMaxIndex = Math.max(0, laps.length - 1)
+  // Domain is continuous lap numbers so every lap gets a tick when there is room.
+  const sampleMax = points.reduce((max, point) => Math.max(max, point.lap), 0)
+  const xMinLap = 1
+  const xMaxLap = Math.max(sampleMax, throughLap ?? 0, 1)
+  const axisLaps = Array.from({ length: xMaxLap - xMinLap + 1 }, (_, i) => xMinLap + i)
 
   const xOf = (lap: number) => {
-    const index = laps.indexOf(lap)
-    if (xMaxIndex === xMinIndex) return pad.left + innerW / 2
+    if (xMaxLap === xMinLap) return pad.left + innerW / 2
     const inset = Math.min(16, innerW / 8)
-    return pad.left + inset + (index / xMaxIndex) * (innerW - inset * 2)
+    return pad.left + inset + ((lap - xMinLap) / (xMaxLap - xMinLap)) * (innerW - inset * 2)
   }
 
   const yOf = (scale: AxisScale, value: number) =>
     yAt(value, scale.domainMin, scale.domainMax, top, bottom, scale.minAtTop)
   const leftPaths = linePath(points, xOf, (point) => (point.left == null ? null : yOf(leftScale, point.left)))
   const rightPaths = linePath(points, xOf, (point) => (point.right == null ? null : yOf(rightScale, point.right)))
-  const lapStep = laps.length > 16 ? Math.ceil(laps.length / 12) : 1
+  // Prefer labeling every lap; only thin labels when the axis is dense.
+  const lapStep = axisLaps.length > 16 ? Math.ceil(axisLaps.length / 12) : 1
   const scales = [leftScale, rightScale]
 
   const tipFor = (point: PlotPoint, scale: AxisScale): HoverTip | null => {
@@ -558,8 +570,8 @@ function ProgressPlot({
             <text x={pad.left + innerW / 2} y={HEIGHT - 8} fill="#a1a1aa" fontSize="12" textAnchor="middle">
               Lap
             </text>
-            {laps.map((lap, index) =>
-              index % lapStep === 0 ? (
+            {axisLaps.map((lap, index) =>
+              index % lapStep === 0 || lap === xMaxLap ? (
                 <text key={lap} x={xOf(lap)} y={bottom + 16} fill="#d4d4d8" fontSize="12" textAnchor="middle">
                   {lap}
                 </text>

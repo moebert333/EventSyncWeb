@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useEventCode } from '../hooks/useEventCode'
 import { useEventParticipants } from '../hooks/useEventResults'
 import { riderName } from '../lib/format'
+import { saveParticipantAsResultsSelection } from '../lib/resultsSelection'
 import type { EntryParticipant } from '../types/database'
 
 type SelectParticipantBoxProps = {
@@ -37,8 +38,18 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
       lastName: rider.last_name,
       participantPlate: rider.participant_plate,
     })
+    saveParticipantAsResultsSelection(eventId, rider.participant_id)
     setRiderSearch('')
     onOk?.()
+  }
+
+  function confirmOk() {
+    if (actionsBusy || !onOk) return
+    if (riders.length === 1) {
+      chooseRider(riders[0])
+      return
+    }
+    onOk()
   }
 
   const panel = (
@@ -47,6 +58,14 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
       role="dialog"
       aria-modal="true"
       aria-label="Select participant"
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter') return
+        if (actionsBusy || !onOk) return
+        // Rider list buttons already confirm on activation.
+        if (event.target instanceof HTMLElement && event.target.closest('ul button')) return
+        event.preventDefault()
+        confirmOk()
+      }}
     >
       <div className="grid w-full max-w-lg gap-3 border border-[#f5c518] bg-[#1a1a1a] p-4 shadow-lg">
         <p className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
@@ -63,7 +82,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
         </label>
         {listOpen ? (
           <div>
-            <p className="text-sm uppercase tracking-wide text-zinc-400">Select a Rider</p>
+            <p className="text-sm uppercase tracking-wide text-zinc-400">Select a Participant:</p>
             {riders.length === 0 ? (
               <p className="mt-1 border border-white/20 px-3 py-2 text-sm text-zinc-400">No matching riders</p>
             ) : (
@@ -91,10 +110,10 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
           </div>
         ) : (
           <label className="block text-sm uppercase tracking-wide text-zinc-400">
-            Select a Rider
+            Select a Participant:
             <select
               className="control mt-1"
-              title="Choose a rider for this event"
+              title="Choose a participant for this event"
               value={selectedForEvent?.participantId ?? ''}
               onChange={(event) => {
                 const nextId = event.target.value ? Number(event.target.value) : null
@@ -110,7 +129,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
                 chooseRider(rider)
               }}
             >
-              <option value="">Select a rider</option>
+              <option value="">Select a participant</option>
               {riders.map((rider) => (
                 <option key={rider.participant_id} value={rider.participant_id}>
                   {riderName(rider.first_name, rider.last_name)}
@@ -134,7 +153,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
                 className="btn"
                 disabled={actionsBusy}
                 title="Continue with the current participant choice"
-                onClick={onOk}
+                onClick={confirmOk}
               >
                 {actionsBusy ? 'Checking…' : 'Ok'}
               </button>

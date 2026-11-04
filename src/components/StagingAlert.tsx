@@ -8,7 +8,7 @@ import {
 } from '../hooks/useEventRaceOrder'
 import { notifyStaging } from '../lib/stagingNotify'
 
-type UrgentLevel = 0 | 1 | 2
+type UrgentLevel = 0 | 1 | 2 | 'inThisRace'
 
 export function StagingAlert() {
   const { context, selectedParticipant } = useEventCode()
@@ -33,7 +33,9 @@ export function StagingAlert() {
       : null
 
   const urgent: UrgentLevel | null =
-    stagingIn === 0 || stagingIn === 1 || stagingIn === 2 ? stagingIn : null
+    stagingIn === 0 || stagingIn === 1 || stagingIn === 2 || stagingIn === 'inThisRace'
+      ? stagingIn
+      : null
   const activeRace = racesQuery.data?.find((race) => race.active)
   const activeRaceId = activeRace?.race_id ?? null
   const activeRaceStatus = urgent === 0 ? (activeRace?.status ?? null) : null
@@ -44,7 +46,7 @@ export function StagingAlert() {
       ? `${activeRaceId}:${urgent}:${label}`
       : null
   const open = alertKey != null && dismissedFor !== alertKey
-  const flash = urgent === 0 || urgent === 1
+  const flash = urgent === 0 || urgent === 1 || urgent === 'inThisRace'
 
   useEffect(() => {
     if (alertKey == null) {

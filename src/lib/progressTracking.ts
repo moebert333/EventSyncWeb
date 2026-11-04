@@ -19,9 +19,33 @@ type SavedProgress = {
 }
 
 let cache: { raceId: number; data: RaceLapProgress } | null = null
+let progressVersion = 0
+const progressListeners = new Set<() => void>()
 
 export function progressKey(classId: number, participantId: number): string {
   return `${classId}:${participantId}`
+}
+
+/** Subscribe to lap-progress writes (localStorage / in-memory cache). */
+export function subscribeLapProgress(listener: () => void): () => void {
+  progressListeners.add(listener)
+  return () => {
+    progressListeners.delete(listener)
+  }
+}
+
+export function getLapProgressVersion(): number {
+  return progressVersion
+}
+
+function notifyLapProgress() {
+  progressVersion += 1
+  for (const listener of progressListeners) listener()
+}
+
+/** Read chart history for a race without merging a timing poll. */
+export function getLapProgressForRace(raceId: number): RaceLapProgress {
+  return loadForRace(raceId).laps
 }
 
 function storage(): Storage | null {
@@ -132,6 +156,7 @@ function persist(raceId: number, laps: RaceLapProgress) {
     }
   }
   cache = { raceId, data: laps }
+  notifyLapProgress()
 }
 
 function placeText(place: unknown): string | null {

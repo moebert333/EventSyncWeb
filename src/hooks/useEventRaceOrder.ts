@@ -167,6 +167,61 @@ export function useParticipantRaceNums(eventId: number | null, participantId: nu
 export type RaceProgressLine =
   | { kind: 'first'; raceNum: number }
   | { kind: 'active'; activeNum: number; nextNum: number }
+  /** In the active race while Staging (no following-race clause). */
+  | { kind: 'inThisRace'; activeNum: number; nextNum?: undefined }
+  /** In the active race while Active / Paused / Finished, with following race. */
+  | { kind: 'inThisRaceWithNext'; activeNum: number; nextNum: number }
+
+/** True when the active race has started or finished (not still Staging). */
+function activeRacePastStaging(status: RaceStatus | null | undefined): boolean {
+  return status === 'Active' || status === 'Paused' || status === 'Finished'
+}
+
+/** Small words left lowercase in progress-line title case (unless first in a sentence). */
+const PROGRESS_SMALL_WORDS = new Set([
+  'a',
+  'an',
+  'the',
+  'and',
+  'or',
+  'but',
+  'in',
+  'on',
+  'of',
+  'to',
+  'for',
+  'at',
+  'by',
+  'as',
+  'is',
+  'are',
+  'was',
+  'were',
+  'be',
+  'this',
+  'that',
+])
+
+/** Title-case progress copy: capitalize words except small ones; always capitalize sentence starts. */
+export function titleCaseProgressLine(text: string): string {
+  return text.replace(/[^.!?]+[.!?]*/g, (sentence) => {
+    const leading = sentence.match(/^\s*/)?.[0] ?? ''
+    const body = sentence.slice(leading.length)
+    if (!body) return sentence
+    let firstWord = true
+    const cased = body.replace(/\b([A-Za-z][A-Za-z']*)\b/g, (word) => {
+      const lower = word.toLowerCase()
+      const cap = lower.charAt(0).toUpperCase() + lower.slice(1)
+      if (firstWord) {
+        firstWord = false
+        return cap
+      }
+      if (PROGRESS_SMALL_WORDS.has(lower)) return lower
+      return cap
+    })
+    return leading + cased
+  })
+}
 
 /** Active + next participant race, or first race when nothing is active. */
 export function raceProgressLine(
@@ -179,45 +234,83 @@ export function raceProgressLine(
   if (!activeRace) {
     return { kind: 'first', raceNum: sorted[0]! }
   }
+
+  const inActiveRace = sorted.includes(activeRace.race_num)
+  if (inActiveRace && activeRace.status === 'Staging') {
+    return { kind: 'inThisRace', activeNum: activeRace.race_num }
+  }
+
+  if (inActiveRace && activeRacePastStaging(activeRace.status)) {
+    const nextNum = sorted.find((num) => num > activeRace.race_num)
+    if (nextNum == null) {
+      return { kind: 'inThisRace', activeNum: activeRace.race_num }
+    }
+    return { kind: 'inThisRaceWithNext', activeNum: activeRace.race_num, nextNum }
+  }
+
   const nextNum = sorted.find((num) => num >= activeRace.race_num)
   if (nextNum == null) return null
   return { kind: 'active', activeNum: activeRace.race_num, nextNum }
 }
 
 export function raceProgressMessage(line: RaceProgressLine): string {
-  if (line.kind === 'first') return `Your first race is number ${line.raceNum}.`
-  return `Active Race: ${line.activeNum}, your next race is number ${line.nextNum}`
+  if (line.kind === 'first') {
+    return titleCaseProgressLine(`Your first race is number ${line.raceNum}.`)
+  }
+  if (line.kind === 'inThisRace') {
+    return titleCaseProgressLine(`Active Race: ${line.activeNum}, you are in this Race!`)
+  }
+  if (line.kind === 'inThisRaceWithNext') {
+    return titleCaseProgressLine(
+      `Active Race: ${line.activeNum}, you are in this Race!  Your next race is number ${line.nextNum}.`,
+    )
+  }
+  return titleCaseProgressLine(
+    `Active Race: ${line.activeNum}, your next race is number ${line.nextNum}`,
+  )
 }
+
+export type StagingInResult = number | 'completed' | 'inThisRace' | null
 
 /**
  * Races from the current active race up to the participant's next race (by race_num).
  * Requires a race with `active` (Staging / Active / Paused / Finished until the next activates).
+ * When the participant is in the active race and it is Staging → 0 ("Your Race is Staging").
+ * When that race is Active / Paused / Finished → `'inThisRace'` ("You are in this Race").
  * Returns `null` when the label should be hidden, `'completed'` when the rider has no races left.
  */
 export function stagingInRaces(
   races: EventRaceOrderRow[],
   participantRaceNums: number[],
-): number | 'completed' | null {
+): StagingInResult {
   if (races.length === 0 || participantRaceNums.length === 0) return null
 
   // Keep the last activated race marked active until another takes over.
   const activeRace = races.find((race) => race.active)
   if (!activeRace) return null
 
-  const nextNum = participantRaceNums
-    .filter((num) => num >= activeRace.race_num)
-    .sort((a, b) => a - b)[0]
+  const sorted = participantRaceNums.slice().sort((a, b) => a - b)
+  const inActiveRace = sorted.includes(activeRace.race_num)
 
+  if (inActiveRace && activeRace.status === 'Staging') return 0
+  if (inActiveRace && activeRacePastStaging(activeRace.status)) return 'inThisRace'
+
+  const nextNum = sorted.find((num) => num >= activeRace.race_num)
   if (nextNum == null) return 'completed'
   return Math.max(0, nextNum - activeRace.race_num)
 }
 
 export function stagingLabelText(
-  stagingIn: number | 'completed' | null,
+  stagingIn: StagingInResult,
   raceStatus?: RaceStatus | null,
 ): string | null {
   if (stagingIn === 'completed') return 'Your races are completed'
-  if (stagingIn === 0) return `Your race is ${raceStatus ?? 'Active'}`
+  if (stagingIn === 'inThisRace') return 'You are in this Race'
+  if (stagingIn === 0) {
+    // Participant is in the Staging active race.
+    if (raceStatus === 'Staging' || raceStatus == null) return 'Your Race is Staging'
+    return `Your race is ${raceStatus}`
+  }
   if (stagingIn === 1 || stagingIn === 2) return 'Your Race is Staging'
   if (stagingIn != null) return `Staging in: ${stagingIn - 2} Races`
   return null

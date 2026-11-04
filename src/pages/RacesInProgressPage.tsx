@@ -7,6 +7,7 @@ import { Skeleton } from '../components/Skeleton'
 import { StatusPill } from '../components/StatusPill'
 import { useEventCode } from '../hooks/useEventCode'
 import { useLiveTiming, useRaceClassNames, useRaceInProgress } from '../hooks/useRaceInProgress'
+import { useLapProgress } from '../hooks/useLapProgress'
 import { useElapsedRaceClock } from '../hooks/useElapsedRaceClock'
 import {
   bestLapLabel,
@@ -17,7 +18,7 @@ import {
   raceTimeSeconds,
   riderName,
 } from '../lib/format'
-import { progressKey, recordLapProgress, type RaceLapProgress } from '../lib/progressTracking'
+import { progressKey } from '../lib/progressTracking'
 import type { ActiveRaceTiming, RaceStatus } from '../types/database'
 
 type HighlightMode = 'firstPlace' | 'bestLap' | 'participant'
@@ -29,7 +30,6 @@ const HIGHLIGHT_LABELS: Record<HighlightMode, string> = {
 }
 
 const LIVE: RaceStatus[] = ['Staging', 'Active', 'Paused']
-const EMPTY_PROGRESS: RaceLapProgress = {}
 
 const SORT_COLUMNS = [
   'class',
@@ -352,7 +352,8 @@ export function RacesInProgressPage() {
     rememberedChartOpen = chartOpen
   }, [selectionRaceId, videoOpen, chartOpen])
 
-  const progress = raceId == null ? EMPTY_PROGRESS : recordLapProgress(raceId, timingRows)
+  // Lap samples are recorded app-wide by LapProgressRecorder; this reads the shared store.
+  const progress = useLapProgress(raceId)
 
   if (!context) return <Navigate to="/?needCode=1" replace />
 
@@ -545,6 +546,7 @@ export function RacesInProgressPage() {
             <ProgressTrackingChart
               riderLabel={chartRow ? `${riderName(chartRow.first_name, chartRow.last_name)} · ${chartRow.class_name}` : ''}
               points={chartPoints}
+              throughLap={chartRow?.current_lap_num}
             />
           </div>
         ) : null}
