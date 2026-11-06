@@ -44,20 +44,21 @@ export function EventParticipantHeader({
     selectedForEvent && racesQuery.data && participantRacesQuery.data
       ? stagingInRaces(racesQuery.data, participantRacesQuery.data)
       : null
-  const activeRaceStatus =
-    stagingIn === 0 ? (racesQuery.data?.find((race) => race.active)?.status ?? null) : null
+  const activeRace = racesQuery.data?.find((race) => race.active) ?? null
+  const activeIsPractice = activeRace?.is_practice ?? false
+  const activeRaceStatus = stagingIn === 0 ? (activeRace?.status ?? null) : null
   const progressLine =
     selectedForEvent && racesQuery.data && participantRacesQuery.data
       ? raceProgressLine(racesQuery.data, participantRacesQuery.data)
       : null
   const progressMessage = progressLine ? raceProgressMessage(progressLine) : null
-  const progressActivePrefix = 'Active Race:'
+  const progressActivePrefix = progressLine?.isPractice ? 'Active Practice:' : 'Active Race:'
 
   const participantLabel = selectedForEvent
     ? `${riderName(selectedForEvent.firstName, selectedForEvent.lastName)}${
         selectedForEvent.participantPlate ? ` · ${selectedForEvent.participantPlate}` : ''
       }`
-    : 'Select Participant'
+    : 'Select Rider'
 
   function finishPick() {
     setPicking(false)
@@ -71,7 +72,7 @@ export function EventParticipantHeader({
       ? 'bg-yellow-300 px-2 py-0.5 font-bold text-black'
       : 'font-semibold text-zinc-300'
 
-  const stagingLabel = stagingLabelText(stagingIn, activeRaceStatus)
+  const stagingLabel = stagingLabelText(stagingIn, activeRaceStatus, activeIsPractice)
 
   return (
     <div
@@ -86,11 +87,11 @@ export function EventParticipantHeader({
           </span>
           <span className="inline-flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span>
-              <span className="text-zinc-400">Participant:</span>{' '}
+              <span className="text-zinc-400">Rider:</span>{' '}
               <button
                 type="button"
                 className="cursor-pointer bg-transparent p-0 font-[inherit] text-[length:inherit] font-bold text-[#f5c518] underline underline-offset-2"
-                title={selectedForEvent ? 'Change selected participant' : 'Select a participant'}
+                title={selectedForEvent ? 'Change selected rider' : 'Select a rider'}
                 onClick={() => setPicking(true)}
               >
                 {participantLabel}

@@ -7,18 +7,18 @@ import { Skeleton } from '../components/Skeleton'
 import { StatusPill } from '../components/StatusPill'
 import { useEventCode } from '../hooks/useEventCode'
 import { useLiveTiming, useRaceClassNames, useRaceInProgress } from '../hooks/useRaceInProgress'
-import { useLapProgress } from '../hooks/useLapProgress'
 import { useElapsedRaceClock } from '../hooks/useElapsedRaceClock'
 import {
   bestLapLabel,
   formatClock,
   formatEventDate,
   formatRaceTime,
+  formatRaceTitle,
   placeRank,
   raceTimeSeconds,
   riderName,
 } from '../lib/format'
-import { progressKey } from '../lib/progressTracking'
+import { lapPointsForParticipant, latestTimingRows } from '../lib/progressTracking'
 import type { ActiveRaceTiming, RaceStatus } from '../types/database'
 
 type HighlightMode = 'firstPlace' | 'bestLap' | 'participant'
@@ -26,7 +26,7 @@ type HighlightMode = 'firstPlace' | 'bestLap' | 'participant'
 const HIGHLIGHT_LABELS: Record<HighlightMode, string> = {
   firstPlace: '1st Place',
   bestLap: 'Best Lap Time',
-  participant: 'Participant',
+  participant: 'Rider',
 }
 
 const LIVE: RaceStatus[] = ['Staging', 'Active', 'Paused']
@@ -229,13 +229,19 @@ function highlightRow(
 }
 
 /**
- * Survives /live remounts so chart vs video stays as left unless the race changes
- * (or this is the first visit for the event).
+ * Survives /live remounts so chart vs video and class chip stay as left.
+ * Chart/video switches to Video only when race status changes (not on page return).
  */
 let rememberedPanelEventId: number | null = null
 let rememberedPanelRaceId: number | null | undefined = undefined
 let rememberedVideoOpen = false
 let rememberedChartOpen = false
+let rememberedPickedClass: string | null = null
+let rememberedAllClasses = false
+/** `classId-participantId` from the last selected table row. */
+let rememberedSelectedKey: string | null = null
+/** Last race status seen on this page; used to open Video only on status change. */
+let rememberedRaceStatus: RaceStatus | null = null
 
 export function RacesInProgressPage() {
   const { context, selectedParticipant } = useEventCode()
@@ -248,7 +254,10 @@ export function RacesInProgressPage() {
     raceQuery.data?.status === 'Active',
   )
   const raceId = raceQuery.data?.race_id ?? null
-  const timingRows = timingQuery.data ?? []
+  /** Full lap history from `active_race_timing` (PK includes current_lap_num). */
+  const allTimingRows = timingQuery.data ?? []
+  /** Live table shows only the latest lap per class + participant. */
+  const timingRows = latestTimingRows(allTimingRows)
   const groups = groupByClass(timingRows)
   const classNames = classNamesFor(
     (classQuery.data ?? []).map((row) => row.class_name),
@@ -256,44 +265,42 @@ export function RacesInProgressPage() {
   )
   /** Unset until the first successful load; then tracks the shown race id. */
   const [selectionRaceId, setSelectionRaceId] = useState<number | null | undefined>(undefined)
-  const [pickedClass, setPickedClass] = useState<string | null>(null)
-  const [allClasses, setAllClasses] = useState(false)
+  const [pickedClass, setPickedClass] = useState<string | null>(() => rememberedPickedClass)
+  const [allClasses, setAllClasses] = useState(() => rememberedAllClasses)
   const [sort, setSort] = useState<SortState>(PLACE_SORT)
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
-  const [chartOpen, setChartOpen] = useState(false)
-  const [videoOpen, setVideoOpen] = useState(false)
+  const [selectedKey, setSelectedKey] = useState<string | null>(() => rememberedSelectedKey)
+  const [chartOpen, setChartOpen] = useState(() => rememberedChartOpen)
+  const [videoOpen, setVideoOpen] = useState(() => rememberedVideoOpen)
   const [highlightMode, setHighlightMode] = useState<HighlightMode>('bestLap')
   const [highlightMenuOpen, setHighlightMenuOpen] = useState(false)
   const highlightMenuRef = useRef<HTMLDivElement>(null)
   const appliedParticipantRaceRef = useRef<number | null>(null)
-  /** Prefer video over participant chart on first land and when race changes while open. */
-  const preferVideoForRaceRef = useRef(false)
+
+  // Local copies so same-render chart/selection logic sees restored values (setState is async).
+  let liveSelectedKey = selectedKey
+  let livePickedClass = pickedClass
+  let liveAllClasses = allClasses
 
   if (raceQuery.isSuccess && selectionRaceId !== raceId) {
     const eventId = context?.eventId ?? null
     const raceChanged =
       rememberedPanelEventId !== eventId || rememberedPanelRaceId !== raceId
-    const hasVideo = raceId != null && raceStatusVideoSrc(raceQuery.data?.status) != null
     setSelectionRaceId(raceId)
-    setPickedClass(null)
-    setAllClasses(false)
+    // Keep last class chip (or none → UI falls back to first class); do not jump to the participant's class.
+    livePickedClass = rememberedPickedClass
+    liveAllClasses = rememberedAllClasses
+    liveSelectedKey = rememberedSelectedKey
+    setPickedClass(livePickedClass)
+    setAllClasses(liveAllClasses)
     setSort(PLACE_SORT)
-    setSelectedKey(null)
+    setSelectedKey(liveSelectedKey)
+    // Always restore last chart/video view on remount; status changes switch to Video separately.
+    setChartOpen(rememberedChartOpen)
+    setVideoOpen(rememberedVideoOpen)
     appliedParticipantRaceRef.current = null
     if (raceChanged) {
-      // First visit or a new active race → Video view when media exists.
-      preferVideoForRaceRef.current = hasVideo
-      setChartOpen(false)
-      setVideoOpen(hasVideo)
       rememberedPanelEventId = eventId
       rememberedPanelRaceId = raceId
-      rememberedChartOpen = false
-      rememberedVideoOpen = hasVideo
-    } else {
-      // Same race after leaving / returning → keep prior chart/video choice.
-      preferVideoForRaceRef.current = !rememberedChartOpen
-      setChartOpen(rememberedChartOpen)
-      setVideoOpen(rememberedVideoOpen)
     }
   }
 
@@ -304,15 +311,14 @@ export function RacesInProgressPage() {
     selectedParticipant
   ) {
     const match = timingRows.find((row) => row.participant_id === selectedParticipant.participantId)
+    const restoredInRace =
+      liveSelectedKey != null && timingRows.some((row) => rowKey(row) === liveSelectedKey)
     if (match) {
       appliedParticipantRaceRef.current = raceId
-      setAllClasses(false)
-      setPickedClass(match.class_name)
-      setSort(PLACE_SORT)
-      setSelectedKey(rowKey(match))
-      if (!preferVideoForRaceRef.current) {
-        setChartOpen(true)
-        setVideoOpen(false)
+      // Prefer the restored table selection when that rider is still in this race.
+      if (!restoredInRace) {
+        liveSelectedKey = rowKey(match)
+        setSelectedKey(liveSelectedKey)
       }
     } else if (timingRows.length > 0) {
       // Race has timing; selected participant is not in this race.
@@ -323,6 +329,21 @@ export function RacesInProgressPage() {
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
+
+  // Open Video only when race status changes (including while away from this page).
+  useEffect(() => {
+    const status = raceQuery.data?.status ?? null
+    if (status == null) return
+    if (rememberedRaceStatus != null && rememberedRaceStatus !== status) {
+      if (raceStatusVideoSrc(status) != null) {
+        rememberedVideoOpen = true
+        rememberedChartOpen = false
+        setVideoOpen(true)
+        setChartOpen(false)
+      }
+    }
+    rememberedRaceStatus = status
+  }, [raceQuery.data?.status])
 
   useEffect(() => {
     if (!highlightMenuOpen) return
@@ -350,10 +371,11 @@ export function RacesInProgressPage() {
     rememberedPanelRaceId = selectionRaceId
     rememberedVideoOpen = videoOpen
     rememberedChartOpen = chartOpen
-  }, [selectionRaceId, videoOpen, chartOpen])
-
-  // Lap samples are recorded app-wide by LapProgressRecorder; this reads the shared store.
-  const progress = useLapProgress(raceId)
+    rememberedPickedClass = pickedClass
+    rememberedAllClasses = allClasses
+    // Do not clobber a stored rider with a transient null before timing/restore settles.
+    if (selectedKey != null) rememberedSelectedKey = selectedKey
+  }, [selectionRaceId, videoOpen, chartOpen, pickedClass, allClasses, selectedKey])
 
   if (!context) return <Navigate to="/?needCode=1" replace />
 
@@ -423,11 +445,11 @@ export function RacesInProgressPage() {
   }
 
   const when = [formatEventDate(race.race_date), formatClock(race.race_start)].filter(Boolean).join(' · ')
-  const showingAll = allClasses && classNames.length > 0
+  const showingAll = liveAllClasses && classNames.length > 0
   const activeClass = showingAll
     ? null
-    : pickedClass != null && classNames.includes(pickedClass)
-      ? pickedClass
+    : livePickedClass != null && classNames.includes(livePickedClass)
+      ? livePickedClass
       : (classNames[0] ?? null)
   const classRows = activeClass ? (groups.get(activeClass) ?? []) : []
   const visibleRows = (showingAll ? timingRows : classRows).slice().sort((a, b) => compareRows(a, b, sort))
@@ -442,30 +464,61 @@ export function RacesInProgressPage() {
         : { column, direction: 'asc' },
     )
   }
-  const selectedRow = visibleRows.find((row) => rowKey(row) === selectedKey) ?? null
-  const chartRow = selectedRow ?? visibleRows[0] ?? null
-  const chartPoints = chartRow
-    ? (progress[progressKey(chartRow.class_id, chartRow.participant_id)] ?? []).filter(
-        (point) => chartRow.current_lap_num == null || point.lap <= chartRow.current_lap_num,
-      )
-    : []
   const highlighted = highlightRow(visibleRows, highlightMode, selectedParticipant?.participantId ?? null)
   const highlightKey = highlighted ? rowKey(highlighted) : null
+  // Defaults when the restored/clicked selection is not in this view:
+  // current header participant if in view, else the green highlight row.
+  const participantInView =
+    selectedParticipant == null
+      ? null
+      : (visibleRows.find((row) => row.participant_id === selectedParticipant.participantId) ?? null)
+  const defaultChartKey = participantInView
+    ? rowKey(participantInView)
+    : highlightKey
+  const selectedInRace =
+    liveSelectedKey != null && timingRows.some((row) => rowKey(row) === liveSelectedKey)
+  const selectedStillVisible =
+    liveSelectedKey != null && visibleRows.some((row) => rowKey(row) === liveSelectedKey)
+  // Keep a restored rider while they remain in the race. Wait for timing before replacing.
+  const chartKey = selectedStillVisible || selectedInRace
+    ? liveSelectedKey
+    : timingQuery.isSuccess
+      ? defaultChartKey
+      : liveSelectedKey
+  if (chartKey != null && chartKey !== liveSelectedKey) {
+    liveSelectedKey = chartKey
+    setSelectedKey(chartKey)
+  }
+  const chartRow =
+    chartKey == null
+      ? null
+      : (visibleRows.find((row) => rowKey(row) === chartKey) ??
+        timingRows.find((row) => rowKey(row) === chartKey) ??
+        null)
+  const chartPoints = chartRow
+    ? lapPointsForParticipant(allTimingRows, chartRow.class_id, chartRow.participant_id)
+    : []
   const hasStatusVideo = raceStatusVideoSrc(race.status) != null
   /** Selecting one panel deselects the other; unselecting leaves the other alone. */
   const toggleChart = () => {
     if (chartOpen) {
+      rememberedChartOpen = false
       setChartOpen(false)
       return
     }
+    rememberedChartOpen = true
+    rememberedVideoOpen = false
     setChartOpen(true)
     setVideoOpen(false)
   }
   const toggleVideo = () => {
     if (videoOpen) {
+      rememberedVideoOpen = false
       setVideoOpen(false)
       return
     }
+    rememberedVideoOpen = true
+    rememberedChartOpen = false
     setVideoOpen(true)
     setChartOpen(false)
   }
@@ -475,14 +528,16 @@ export function RacesInProgressPage() {
       <EventParticipantHeader
         eventId={context.eventId}
         eventName={race.event_name || context.eventName}
-        pageTitle="Active Race"
+        pageTitle={race.is_practice ? 'Active Practice' : 'Active Race'}
         onParticipantChanged={() => {
           appliedParticipantRaceRef.current = null
         }}
       />
       <header className="border-b border-[#f5c518] pb-4">
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-4xl font-extrabold uppercase">Race {race.race_num}</h1>
+          <h1 className="font-display text-4xl font-extrabold uppercase">
+            {formatRaceTitle(race.race_num, race.is_practice, race.race_name)}
+          </h1>
           <StatusPill status={race.status} />
           <div className="ml-auto flex items-center gap-3 pr-2">
             <button
@@ -525,7 +580,10 @@ export function RacesInProgressPage() {
               type="button"
               className="ml-auto mr-[20%] cursor-pointer bg-transparent p-0 text-sm font-normal text-[#f0d56a] underline underline-offset-2"
               title="Hide status video"
-              onClick={() => setVideoOpen(false)}
+              onClick={() => {
+                rememberedVideoOpen = false
+                setVideoOpen(false)
+              }}
             >
               Hide Video
             </button>
@@ -534,7 +592,10 @@ export function RacesInProgressPage() {
               type="button"
               className="ml-auto mr-[20%] cursor-pointer bg-transparent p-0 text-sm font-normal text-[#f0d56a] underline underline-offset-2"
               title="Hide progress chart"
-              onClick={() => setChartOpen(false)}
+              onClick={() => {
+                rememberedChartOpen = false
+                setChartOpen(false)
+              }}
             >
               Hide Chart
             </button>
@@ -564,6 +625,8 @@ export function RacesInProgressPage() {
                     selected ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
                   }`}
                   onClick={() => {
+                    rememberedAllClasses = false
+                    rememberedPickedClass = name
                     setAllClasses(false)
                     setPickedClass(name)
                     setSort((current) => (current.column === 'class' ? PLACE_SORT : current))
@@ -581,6 +644,7 @@ export function RacesInProgressPage() {
                 showingAll ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
               }`}
               onClick={() => {
+                rememberedAllClasses = true
                 setAllClasses(true)
                 setSort(DEFAULT_SORT)
               }}
@@ -669,7 +733,7 @@ export function RacesInProgressPage() {
                 <tbody>
                   {visibleRows.map((row) => {
                     const key = rowKey(row)
-                    const selected = key === selectedKey
+                    const selected = key === liveSelectedKey
                     const isLeader = key === highlightKey
                     const className = ['is-selectable', selected ? 'is-selected' : '', isLeader ? 'is-leader' : '']
                       .filter(Boolean)
@@ -694,10 +758,22 @@ export function RacesInProgressPage() {
                         tabIndex={0}
                         aria-selected={selected}
                         title={`Select ${riderName(row.first_name, row.last_name)} for the chart`}
-                        onClick={() => setSelectedKey(key)}
+                        onClick={() => {
+                          rememberedSelectedKey = key
+                          if (!showingAll && activeClass) {
+                            rememberedPickedClass = activeClass
+                            rememberedAllClasses = false
+                          }
+                          setSelectedKey(key)
+                        }}
                         onKeyDown={(event) => {
                           if (event.key !== 'Enter' && event.key !== ' ') return
                           event.preventDefault()
+                          rememberedSelectedKey = key
+                          if (!showingAll && activeClass) {
+                            rememberedPickedClass = activeClass
+                            rememberedAllClasses = false
+                          }
                           setSelectedKey(key)
                         }}
                       >

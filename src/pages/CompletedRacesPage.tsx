@@ -127,6 +127,22 @@ export function CompletedRacesPage() {
     setCollapsedClasses(new Set())
   }, [request?.eventId, request?.className, request?.participantId, request?.raceId])
 
+  // Drop a race filter that points at a practice (or otherwise missing) race.
+  useEffect(() => {
+    if (!racesQuery.isSuccess) return
+    const races = racesQuery.data ?? []
+    const raceMissing =
+      (raceId !== '' && !races.some((race) => race.race_id === raceId)) ||
+      (request?.raceId != null && !races.some((race) => race.race_id === request.raceId))
+    if (!raceMissing) return
+    setRaceId('')
+    if (request?.raceId != null) {
+      setRequest(null)
+      setSelectOpen(true)
+      clearResultsSelection()
+    }
+  }, [racesQuery.isSuccess, racesQuery.data, raceId, request?.raceId])
+
   if (!context) return <Navigate to="/?needCode=1" replace />
 
   // Drop a stored selection whose event is no longer available in this org.
@@ -435,7 +451,7 @@ export function CompletedRacesPage() {
                   />
                   Class
                 </label>
-                <label className="inline-flex items-center gap-2" title="Filter results by participant">
+                <label className="inline-flex items-center gap-2" title="Filter results by rider">
                   <input
                     type="radio"
                     name="result-mode"
@@ -445,7 +461,7 @@ export function CompletedRacesPage() {
                       setRequest(null)
                     }}
                   />
-                  Participant
+                  Rider
                 </label>
                 <label className="inline-flex items-center gap-2" title="Filter results by race">
                   <input
@@ -490,7 +506,7 @@ export function CompletedRacesPage() {
                     />
                   </label>
                   <label className="flex flex-wrap items-start gap-x-3 gap-y-1 text-sm uppercase tracking-wide text-zinc-400">
-                    <span className="shrink-0 pt-2">Participant</span>
+                    <span className="shrink-0 pt-2">Rider</span>
                     <select
                       className="control min-w-0 flex-1"
                       title="Choose a rider"

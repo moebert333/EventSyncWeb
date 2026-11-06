@@ -57,7 +57,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-20"
       role="dialog"
       aria-modal="true"
-      aria-label="Select participant"
+      aria-label="Select rider"
       onKeyDown={(event) => {
         if (event.key !== 'Enter') return
         if (actionsBusy || !onOk) return
@@ -69,7 +69,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
     >
       <div className="grid w-full max-w-lg gap-3 border border-[#f5c518] bg-[#1a1a1a] p-4 shadow-lg">
         <p className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
-          Select participant <span className="normal-case tracking-normal text-zinc-500">(optional)</span>
+          Select rider <span className="normal-case tracking-normal text-zinc-500">(optional)</span>
         </p>
         <label className="block text-sm uppercase tracking-wide text-zinc-400">
           Search name or plate
@@ -82,7 +82,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
         </label>
         {listOpen ? (
           <div>
-            <p className="text-sm uppercase tracking-wide text-zinc-400">Select a Participant:</p>
+            <p className="text-sm uppercase tracking-wide text-zinc-400">Select a Rider:</p>
             {riders.length === 0 ? (
               <p className="mt-1 border border-white/20 px-3 py-2 text-sm text-zinc-400">No matching riders</p>
             ) : (
@@ -110,10 +110,10 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
           </div>
         ) : (
           <label className="block text-sm uppercase tracking-wide text-zinc-400">
-            Select a Participant:
+            Select a Rider:
             <select
               className="control mt-1"
-              title="Choose a participant for this event"
+              title="Choose a rider for this event"
               value={selectedForEvent?.participantId ?? ''}
               onChange={(event) => {
                 const nextId = event.target.value ? Number(event.target.value) : null
@@ -129,7 +129,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
                 chooseRider(rider)
               }}
             >
-              <option value="">Select a participant</option>
+              <option value="">Select a rider</option>
               {riders.map((rider) => (
                 <option key={rider.participant_id} value={rider.participant_id}>
                   {riderName(rider.first_name, rider.last_name)}
@@ -152,7 +152,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
                 type="button"
                 className="btn"
                 disabled={actionsBusy}
-                title="Continue with the current participant choice"
+                title="Continue with the current rider choice"
                 onClick={confirmOk}
               >
                 {actionsBusy ? 'Checking…' : 'Ok'}
@@ -163,7 +163,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
                 type="button"
                 className="btn btn-ghost"
                 disabled={actionsBusy}
-                title="Continue without changing the participant"
+                title="Continue without changing the rider"
                 onClick={onSkip}
               >
                 Skip

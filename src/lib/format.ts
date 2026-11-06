@@ -63,6 +63,32 @@ export function riderName(first: string, last: string): string {
   return `${first} ${last}`.trim()
 }
 
+/** Display label for a race number: "Practice 3" or "Race 3". */
+export function formatRaceNumberLabel(
+  raceNum: number,
+  isPractice: boolean | null | undefined,
+): string {
+  return isPractice ? `Practice ${raceNum}` : `Race ${raceNum}`
+}
+
+/**
+ * Number label, optionally with race_name when it differs.
+ * Practice sessions never append race_name.
+ */
+export function formatRaceTitle(
+  raceNum: number,
+  isPractice: boolean | null | undefined,
+  raceName?: string | null,
+): string {
+  const numberLabel = formatRaceNumberLabel(raceNum, isPractice)
+  if (isPractice) return numberLabel
+  const name = raceName?.trim() ?? ''
+  if (!name || name.localeCompare(numberLabel, undefined, { sensitivity: 'accent' }) === 0) {
+    return numberLabel
+  }
+  return `${numberLabel} · ${name}`
+}
+
 export function placeRank(place: string | null | undefined): number {
   if (place == null || place === '') return 10_000
   if (place === 'DNS/DNF') return 9_000

@@ -10,6 +10,7 @@ import type {
 type RaceRow = {
   race_id: number
   race_num: number
+  is_practice: boolean | null
   race_name: string | null
   session_name: string | null
   active: boolean | null
@@ -49,7 +50,7 @@ export function useEventRaceOrder(eventId: number | null) {
     queryFn: async (): Promise<EventRaceOrderRow[]> => {
       const racesResult = await supabase
         .from('races')
-        .select('race_id, race_num, race_name, session_name, active, completed')
+        .select('race_id, race_num, is_practice, race_name, session_name, active, completed')
         .eq('event_id', eventId!)
         .order('race_num')
       if (racesResult.error) throw racesResult.error
@@ -81,6 +82,7 @@ export function useEventRaceOrder(eventId: number | null) {
       return races.map((race) => ({
         race_id: race.race_id,
         race_num: race.race_num,
+        is_practice: Boolean(race.is_practice),
         race_name: race.race_name,
         session_name: race.session_name,
         active: Boolean(race.active),
@@ -130,10 +132,10 @@ export function useClassParticipants(eventId: number | null, classId: number | n
   })
 }
 
-/** Race numbers the participant is entered in for this event (via event_entry → race_class). */
+/** Race ids the participant is entered in for this event (via event_entry → race_class). */
 export function useParticipantRaceNums(eventId: number | null, participantId: number | null) {
   return useQuery({
-    queryKey: ['participant-race-nums', eventId, participantId],
+    queryKey: ['participant-race-ids', eventId, participantId],
     enabled: eventId != null && participantId != null,
     queryFn: async (): Promise<number[]> => {
       const entries = await supabase
@@ -147,34 +149,55 @@ export function useParticipantRaceNums(eventId: number | null, participantId: nu
 
       const raceClasses = await supabase
         .from('race_class')
-        .select('race_id, races!inner(event_id, race_num)')
+        .select('race_id, races!inner(event_id)')
         .in('class_id', classIds)
         .eq('races.event_id', eventId!)
       if (raceClasses.error) throw raceClasses.error
 
-      const nums = new Set<number>()
+      const ids = new Set<number>()
       for (const row of raceClasses.data ?? []) {
-        const related = (row as { races: { race_num: number } | { race_num: number }[] }).races
-        const raceNum = Array.isArray(related) ? related[0]?.race_num : related?.race_num
-        if (raceNum != null) nums.add(raceNum)
+        const raceId = (row as { race_id: number }).race_id
+        if (raceId != null) ids.add(raceId)
       }
-      return [...nums].sort((a, b) => a - b)
+      return [...ids].sort((a, b) => a - b)
     },
     refetchInterval: 5000,
   })
 }
 
+/** Races (or practices) matching the active session type. */
+function sessionPool(races: EventRaceOrderRow[], isPractice: boolean): EventRaceOrderRow[] {
+  return races.filter((race) => race.is_practice === isPractice)
+}
+
+/** Participant race/practice numbers within a session pool, sorted by race_num. */
+function participantSessionNums(
+  pool: EventRaceOrderRow[],
+  participantRaceIds: number[],
+): number[] {
+  const idSet = new Set(participantRaceIds)
+  return pool
+    .filter((race) => idSet.has(race.race_id))
+    .map((race) => race.race_num)
+    .sort((a, b) => a - b)
+}
+
 export type RaceProgressLine =
-  | { kind: 'first'; raceNum: number }
-  | { kind: 'active'; activeNum: number; nextNum: number }
-  /** In the active race while Staging (no following-race clause). */
-  | { kind: 'inThisRace'; activeNum: number; nextNum?: undefined }
-  /** In the active race while Active / Paused / Finished, with following race. */
-  | { kind: 'inThisRaceWithNext'; activeNum: number; nextNum: number }
+  | { kind: 'first'; raceNum: number; isPractice: boolean }
+  | { kind: 'active'; activeNum: number; nextNum: number; isPractice: boolean }
+  /** In the active session while Staging (no following-session clause). */
+  | { kind: 'inThisRace'; activeNum: number; nextNum?: undefined; isPractice: boolean }
+  /** In the active session while Active / Paused / Finished, with following session. */
+  | { kind: 'inThisRaceWithNext'; activeNum: number; nextNum: number; isPractice: boolean }
 
 /** True when the active race has started or finished (not still Staging). */
 function activeRacePastStaging(status: RaceStatus | null | undefined): boolean {
   return status === 'Active' || status === 'Paused' || status === 'Finished'
+}
+
+function sessionWord(isPractice: boolean, capitalize: boolean): string {
+  if (capitalize) return isPractice ? 'Practice' : 'Race'
+  return isPractice ? 'practice' : 'race'
 }
 
 /** Small words left lowercase in progress-line title case (unless first in a sentence). */
@@ -223,74 +246,86 @@ export function titleCaseProgressLine(text: string): string {
   })
 }
 
-/** Active + next participant race, or first race when nothing is active. */
+/**
+ * Active + next participant session, or first session when nothing is active.
+ * When a practice is active, counts practices only; when a normal race is active, races only.
+ * When nothing is active, defaults to competitive races.
+ */
 export function raceProgressLine(
   races: EventRaceOrderRow[],
-  participantRaceNums: number[],
+  participantRaceIds: number[],
 ): RaceProgressLine | null {
-  if (participantRaceNums.length === 0) return null
-  const sorted = participantRaceNums.slice().sort((a, b) => a - b)
-  const activeRace = races.find((race) => race.active)
+  const activeRace = races.find((race) => race.active) ?? null
+  const isPractice = activeRace?.is_practice ?? false
+  const pool = sessionPool(races, isPractice)
+  const sorted = participantSessionNums(pool, participantRaceIds)
+  if (sorted.length === 0) return null
   if (!activeRace) {
-    return { kind: 'first', raceNum: sorted[0]! }
+    return { kind: 'first', raceNum: sorted[0]!, isPractice }
   }
 
-  const inActiveRace = sorted.includes(activeRace.race_num)
+  const inActiveRace = participantRaceIds.includes(activeRace.race_id)
   if (inActiveRace && activeRace.status === 'Staging') {
-    return { kind: 'inThisRace', activeNum: activeRace.race_num }
+    return { kind: 'inThisRace', activeNum: activeRace.race_num, isPractice }
   }
 
   if (inActiveRace && activeRacePastStaging(activeRace.status)) {
     const nextNum = sorted.find((num) => num > activeRace.race_num)
     if (nextNum == null) {
-      return { kind: 'inThisRace', activeNum: activeRace.race_num }
+      return { kind: 'inThisRace', activeNum: activeRace.race_num, isPractice }
     }
-    return { kind: 'inThisRaceWithNext', activeNum: activeRace.race_num, nextNum }
+    return { kind: 'inThisRaceWithNext', activeNum: activeRace.race_num, nextNum, isPractice }
   }
 
   const nextNum = sorted.find((num) => num >= activeRace.race_num)
   if (nextNum == null) return null
-  return { kind: 'active', activeNum: activeRace.race_num, nextNum }
+  return { kind: 'active', activeNum: activeRace.race_num, nextNum, isPractice }
 }
 
 export function raceProgressMessage(line: RaceProgressLine): string {
+  const unit = sessionWord(line.isPractice, false)
+  const Unit = sessionWord(line.isPractice, true)
   if (line.kind === 'first') {
-    return titleCaseProgressLine(`Your first race is number ${line.raceNum}.`)
+    return titleCaseProgressLine(`Your first ${unit} is number ${line.raceNum}.`)
   }
   if (line.kind === 'inThisRace') {
-    return titleCaseProgressLine(`Active Race: ${line.activeNum}, you are in this Race!`)
+    return titleCaseProgressLine(`Active ${Unit}: ${line.activeNum}, you are in this ${Unit}!`)
   }
   if (line.kind === 'inThisRaceWithNext') {
     return titleCaseProgressLine(
-      `Active Race: ${line.activeNum}, you are in this Race!  Your next race is number ${line.nextNum}.`,
+      `Active ${Unit}: ${line.activeNum}, you are in this ${Unit}!  Your next ${unit} is number ${line.nextNum}.`,
     )
   }
   return titleCaseProgressLine(
-    `Active Race: ${line.activeNum}, your next race is number ${line.nextNum}`,
+    `Active ${Unit}: ${line.activeNum}, your next ${unit} is number ${line.nextNum}`,
   )
 }
 
 export type StagingInResult = number | 'completed' | 'inThisRace' | null
 
 /**
- * Races from the current active race up to the participant's next race (by race_num).
- * Requires a race with `active` (Staging / Active / Paused / Finished until the next activates).
- * When the participant is in the active race and it is Staging → 0 ("Your Race is Staging").
- * When that race is Active / Paused / Finished → `'inThisRace'` ("You are in this Race").
- * Returns `null` when the label should be hidden, `'completed'` when the rider has no races left.
+ * Sessions from the current active race/practice up to the participant's next one (by race_num).
+ * Scoped to practices when the active session is a practice; otherwise competitive races.
+ * When the participant is in the active session and it is Staging → 0 ("Your Race/Practice is Staging").
+ * When that session is Active / Paused / Finished → `'inThisRace'` ("You are in this Race/Practice").
+ * Returns `null` when the label should be hidden, `'completed'` when the rider has no sessions left in that pool.
  */
 export function stagingInRaces(
   races: EventRaceOrderRow[],
-  participantRaceNums: number[],
+  participantRaceIds: number[],
 ): StagingInResult {
-  if (races.length === 0 || participantRaceNums.length === 0) return null
+  if (participantRaceIds.length === 0) return null
 
   // Keep the last activated race marked active until another takes over.
   const activeRace = races.find((race) => race.active)
   if (!activeRace) return null
 
-  const sorted = participantRaceNums.slice().sort((a, b) => a - b)
-  const inActiveRace = sorted.includes(activeRace.race_num)
+  const pool = sessionPool(races, activeRace.is_practice)
+  if (pool.length === 0) return null
+
+  const sorted = participantSessionNums(pool, participantRaceIds)
+  if (sorted.length === 0) return null
+  const inActiveRace = participantRaceIds.includes(activeRace.race_id)
 
   if (inActiveRace && activeRace.status === 'Staging') return 0
   if (inActiveRace && activeRacePastStaging(activeRace.status)) return 'inThisRace'
@@ -303,15 +338,19 @@ export function stagingInRaces(
 export function stagingLabelText(
   stagingIn: StagingInResult,
   raceStatus?: RaceStatus | null,
+  isPractice = false,
 ): string | null {
-  if (stagingIn === 'completed') return 'Your races are completed'
-  if (stagingIn === 'inThisRace') return 'You are in this Race'
+  const Unit = sessionWord(isPractice, true)
+  const units = isPractice ? 'practices' : 'races'
+  const Units = isPractice ? 'Practices' : 'Races'
+  if (stagingIn === 'completed') return `Your ${units} are completed`
+  if (stagingIn === 'inThisRace') return `You are in this ${Unit}`
   if (stagingIn === 0) {
-    // Participant is in the Staging active race.
-    if (raceStatus === 'Staging' || raceStatus == null) return 'Your Race is Staging'
-    return `Your race is ${raceStatus}`
+    // Participant is in the Staging active session.
+    if (raceStatus === 'Staging' || raceStatus == null) return `Your ${Unit} is Staging`
+    return `Your ${sessionWord(isPractice, false)} is ${raceStatus}`
   }
-  if (stagingIn === 1 || stagingIn === 2) return 'Your Race is Staging'
-  if (stagingIn != null) return `Staging in: ${stagingIn - 2} Races`
+  if (stagingIn === 1 || stagingIn === 2) return `Your ${Unit} is Staging`
+  if (stagingIn != null) return `Staging in: ${stagingIn - 2} ${Units}`
   return null
 }

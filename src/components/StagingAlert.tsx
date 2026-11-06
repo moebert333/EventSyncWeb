@@ -39,7 +39,10 @@ export function StagingAlert() {
   const activeRace = racesQuery.data?.find((race) => race.active)
   const activeRaceId = activeRace?.race_id ?? null
   const activeRaceStatus = urgent === 0 ? (activeRace?.status ?? null) : null
-  const label = urgent != null ? stagingLabelText(urgent, activeRaceStatus) : null
+  const label =
+    urgent != null
+      ? stagingLabelText(urgent, activeRaceStatus, activeRace?.is_practice ?? false)
+      : null
   // Include active race so a new race re-opens even when the message text matches.
   const alertKey =
     urgent != null && label != null && activeRaceId != null

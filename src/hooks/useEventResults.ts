@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { placeRank } from '../lib/format'
+import { formatRaceTitle, placeRank } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { ClassRow, EntryParticipant, EventClassResult, EventRow, Series } from '../types/database'
 
@@ -14,11 +14,12 @@ export type EventRaceOption = {
   race_id: number
   race_num: number
   race_name: string | null
+  is_practice: boolean
 }
 
 export function raceOptionLabel(race: EventRaceOption): string {
-  const name = race.race_name?.trim()
-  return name || `Race ${race.race_num}`
+  // Results only list competitive races (practices are filtered out upstream).
+  return formatRaceTitle(race.race_num, false, race.race_name)
 }
 
 const RESULT_COLUMNS =
@@ -103,11 +104,12 @@ export function useEventRaces(eventId: number | null) {
     queryFn: async (): Promise<EventRaceOption[]> => {
       const { data, error } = await supabase
         .from('races')
-        .select('race_id, race_num, race_name')
+        .select('race_id, race_num, race_name, is_practice')
         .eq('event_id', eventId!)
         .order('race_num')
       if (error) throw error
-      return (data ?? []) as EventRaceOption[]
+      // Practice sessions do not save results — omit them from Results filters.
+      return ((data ?? []) as EventRaceOption[]).filter((race) => !race.is_practice)
     },
   })
 }

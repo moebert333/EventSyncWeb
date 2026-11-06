@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { EventParticipantHeader } from '../components/EventParticipantHeader'
@@ -12,7 +12,7 @@ import {
   useEventRaceOrder,
   useParticipantRaceNums,
 } from '../hooks/useEventRaceOrder'
-import { formatSessionName, riderName, sessionsShareCommonPrefix } from '../lib/format'
+import { formatRaceTitle, formatSessionName, riderName, sessionsShareCommonPrefix } from '../lib/format'
 import type { EntryParticipant, EventRaceOrderClass, EventRaceOrderRow } from '../types/database'
 
 /** Fallback when sticky bars cannot be measured yet. */
@@ -27,26 +27,38 @@ function stickyBarsBottom(): number {
 }
 
 /** Scroll a race row into view just below the site header + Event/Participant strip. */
-function scrollRaceIntoView(raceId: number) {
+function scrollRaceIntoView(raceId: number): boolean {
   const el = document.getElementById(`race-order-${raceId}`)
-  if (!el) return
+  if (!el) return false
   const gap = 8
   const delta = el.getBoundingClientRect().top - stickyBarsBottom() - gap
-  if (Math.abs(delta) < 1) return
-  window.scrollBy({ top: delta, behavior: 'smooth' })
+  if (Math.abs(delta) >= 1) {
+    window.scrollBy({ top: delta, behavior: 'smooth' })
+  }
+  return true
+}
+
+function isBeforeActiveRace(
+  race: EventRaceOrderRow,
+  activeRace: EventRaceOrderRow | null,
+): boolean {
+  if (!activeRace || race.race_id === activeRace.race_id) return false
+  // Practice sessions run before competitive races.
+  if (race.is_practice && !activeRace.is_practice) return true
+  if (!race.is_practice && activeRace.is_practice) return false
+  return race.race_num < activeRace.race_num
 }
 
 function raceTone(
   race: EventRaceOrderRow,
   isParticipantRace: boolean,
-  activeRaceNum: number | null,
+  activeRace: EventRaceOrderRow | null,
 ): string {
   if (race.active) return 'border-green-500 bg-green-500/15'
   if (isParticipantRace) {
     // Past participant races: light grey fill, same outline as non-participant races.
     // Upcoming: light blue fill with blue outline.
-    const beforeActive = activeRaceNum != null && race.race_num < activeRaceNum
-    if (beforeActive) return 'border-white/15 bg-zinc-400/25'
+    if (isBeforeActiveRace(race, activeRace)) return 'border-white/15 bg-zinc-400/25'
     return 'border-sky-400 bg-sky-400/15'
   }
   if (race.completed) return 'border-zinc-600 bg-zinc-800/80'
@@ -140,13 +152,13 @@ function ClassParticipants({
               className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 py-20"
               role="dialog"
               aria-modal="true"
-              aria-label="Confirm participant"
+              aria-label="Confirm rider"
             >
               <div className="grid w-full max-w-lg gap-4 border border-[#f5c518] bg-[#1a1a1a] p-4 shadow-lg">
                 <p className="text-base text-white">
                   Select {pendingName}
                   {pendingRider.participant_plate ? ` · ${pendingRider.participant_plate}` : ''} as
-                  your participant?
+                  your rider?
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -160,7 +172,7 @@ function ClassParticipants({
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    title="Cancel participant selection"
+                    title="Cancel rider selection"
                     onClick={() => setPendingRider(null)}
                   >
                     Cancel
@@ -179,37 +191,34 @@ function RaceRow({
   eventId,
   race,
   isParticipantRace,
-  activeRaceNum,
+  participantDisplayName,
+  activeRace,
   stripSessionPrefix,
 }: {
   eventId: number
   race: EventRaceOrderRow
   isParticipantRace: boolean
-  activeRaceNum: number | null
+  participantDisplayName: string | null
+  activeRace: EventRaceOrderRow | null
   stripSessionPrefix: boolean
 }) {
   const [openClassIds, setOpenClassIds] = useState<number[]>([])
-  // Order: Participant, Completed, then Active / exact status.
+  // Order: Rider, Completed, then Active / exact status.
   const labels: string[] = []
-  if (isParticipantRace) labels.push('Participant')
+  if (isParticipantRace) labels.push('Rider')
   if (race.completed) labels.push('Completed')
   if (race.active) {
     // Exact status (Staging / Paused / …) only when the selected rider is in this race.
     labels.push(isParticipantRace ? (race.status ?? 'Active') : 'Active')
   }
 
-  const raceNumberLabel = `Race ${race.race_num}`
-  const raceName = race.race_name?.trim() ?? ''
-  const raceTitle =
-    raceName && raceName.localeCompare(raceNumberLabel, undefined, { sensitivity: 'accent' }) !== 0
-      ? `${raceNumberLabel} · ${raceName}`
-      : raceNumberLabel
+  const raceTitle = formatRaceTitle(race.race_num, race.is_practice, race.race_name)
   const sessionLabel = formatSessionName(race.session_name, stripSessionPrefix)
   const openClasses = race.classes.filter((raceClass) => openClassIds.includes(raceClass.class_id))
 
   function badgeClass(label: string): string {
     if (statusToneClass[label]) return statusToneClass[label]
-    if (label === 'Participant') return 'bg-sky-400 text-black'
+    if (label === 'Rider') return 'bg-sky-400 text-black'
     return 'bg-zinc-600 text-white'
   }
 
@@ -231,27 +240,35 @@ function RaceRow({
   return (
     <li
       id={`race-order-${race.race_id}`}
-      className={`cursor-pointer border ${RACE_SCROLL_MARGIN} ${raceTone(race, isParticipantRace, activeRaceNum)}`}
+      className={`cursor-pointer border ${RACE_SCROLL_MARGIN} ${raceTone(race, isParticipantRace, activeRace)}`}
       onClick={onRowBackgroundClick}
     >
       <div className="min-h-11 px-3 py-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="font-display text-xl font-bold uppercase">{raceTitle}</span>
           {labels.map((label) => (
-            <span
-              key={label}
-              className={`inline-flex px-2 py-0.5 text-xs font-bold uppercase ${badgeClass(label)}`}
-            >
-              {label}
+            <span key={label} className="inline-flex items-center gap-x-2">
+              <span
+                className={`inline-flex px-2 py-0.5 text-xs font-bold uppercase ${badgeClass(label)}`}
+              >
+                {label}
+              </span>
+              {label === 'Rider' && participantDisplayName ? (
+                <span className="text-sm font-semibold normal-case text-sky-300">
+                  {participantDisplayName}
+                </span>
+              ) : null}
             </span>
           ))}
           {race.active ? (
             <Link
               to="/live"
               className="text-sm font-normal text-[#f0d56a] underline underline-offset-2"
-              title="Go to the Active Race page"
+              title={
+                race.is_practice ? 'Go to the Active Practice page' : 'Go to the Active Race page'
+              }
             >
-              View Race
+              {race.is_practice ? 'View Practice' : 'View Race'}
             </Link>
           ) : null}
         </div>
@@ -304,11 +321,20 @@ export function RaceOrderPage() {
   const participantRacesQuery = useParticipantRaceNums(context?.eventId ?? null, participantId)
   const [progressOpen, setProgressOpen] = useState(false)
   const [progressShownFor, setProgressShownFor] = useState<string | null>(null)
+  const [practiceOpen, setPracticeOpen] = useState(true)
+  const [racesOpen, setRacesOpen] = useState(true)
+  const scrolledForKey = useRef<string | null>(null)
 
   const races = racesQuery.data ?? []
+  const practiceRaces = races.filter((race) => race.is_practice)
+  const competitiveRaces = races.filter((race) => !race.is_practice)
   const activeRace = races.find((race) => race.active) ?? null
   const activeRaceId = activeRace?.race_id ?? null
-  const activeRaceNum = activeRace?.race_num ?? null
+  const activeRaceIsPractice = activeRace?.is_practice ?? null
+  const activeScrollKey =
+    activeRaceId != null && activeRaceIsPractice != null
+      ? `${location.key}:${activeRaceId}:${activeRaceIsPractice ? 'p' : 'r'}`
+      : null
 
   const selectedForEvent =
     selectedParticipant && context && selectedParticipant.eventId === context.eventId
@@ -343,24 +369,61 @@ export function RaceOrderPage() {
     return () => window.clearTimeout(timer)
   }, [progressOpen])
 
-  // Scroll on every visit to this page (location.key) and when the active race changes.
+  // Expand/collapse sections for the active race on page visit / active change.
+  // Scroll runs in a layout effect after this state is committed so positions are final
+  // (e.g. Practice Sessions collapsed before measuring a normal race).
   useEffect(() => {
-    if (activeRaceId == null) return
-    let cancelled = false
-    const frame = window.requestAnimationFrame(() => {
-      if (cancelled) return
-      scrollRaceIntoView(activeRaceId)
-    })
-    return () => {
-      cancelled = true
-      window.cancelAnimationFrame(frame)
-    }
-  }, [activeRaceId, location.key])
+    if (activeRaceId == null || activeRaceIsPractice == null) return
+    setPracticeOpen(activeRaceIsPractice)
+    if (!activeRaceIsPractice) setRacesOpen(true)
+  }, [activeRaceId, activeRaceIsPractice, location.key])
+
+  useLayoutEffect(() => {
+    if (activeScrollKey == null || activeRaceId == null || activeRaceIsPractice == null) return
+    if (scrolledForKey.current === activeScrollKey) return
+
+    const sectionOpen = activeRaceIsPractice ? practiceOpen : racesOpen
+    if (!sectionOpen) return
+    // Wait until practice is collapsed when a normal race is active so layout is final.
+    if (!activeRaceIsPractice && practiceRaces.length > 0 && practiceOpen) return
+
+    if (!scrollRaceIntoView(activeRaceId)) return
+    scrolledForKey.current = activeScrollKey
+  }, [
+    activeScrollKey,
+    activeRaceId,
+    activeRaceIsPractice,
+    practiceOpen,
+    racesOpen,
+    practiceRaces.length,
+  ])
 
   if (!context) return <Navigate to="/?needCode=1" replace />
 
-  const participantRaceNums = new Set(participantRacesQuery.data ?? [])
+  const participantRaceIds = new Set(participantRacesQuery.data ?? [])
   const stripSessionPrefix = sessionsShareCommonPrefix(races.map((race) => race.session_name))
+
+  const participantDisplayName = selectedForEvent
+    ? riderName(selectedForEvent.firstName, selectedForEvent.lastName)
+    : null
+
+  function renderRaceList(list: EventRaceOrderRow[]) {
+    return (
+      <ul className="space-y-2">
+        {list.map((race) => (
+          <RaceRow
+            key={race.race_id}
+            eventId={context!.eventId}
+            race={race}
+            isParticipantRace={participantRaceIds.has(race.race_id)}
+            participantDisplayName={participantDisplayName}
+            activeRace={activeRace}
+            stripSessionPrefix={stripSessionPrefix}
+          />
+        ))}
+      </ul>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -392,18 +455,46 @@ export function RaceOrderPage() {
         <p className="panel">No races are listed for this event yet.</p>
       ) : null}
       {races.length > 0 ? (
-        <ul className="space-y-2">
-          {races.map((race) => (
-            <RaceRow
-              key={race.race_id}
-              eventId={context.eventId}
-              race={race}
-              isParticipantRace={participantRaceNums.has(race.race_num)}
-              activeRaceNum={activeRaceNum}
-              stripSessionPrefix={stripSessionPrefix}
-            />
-          ))}
-        </ul>
+        <div className="space-y-6">
+          {practiceRaces.length > 0 ? (
+            <section className="space-y-2">
+              <button
+                type="button"
+                className="inline-flex cursor-pointer items-center gap-2 bg-transparent p-0 text-left"
+                aria-expanded={practiceOpen}
+                title={practiceOpen ? 'Hide Practice Sessions' : 'Show Practice Sessions'}
+                onClick={() => setPracticeOpen((open) => !open)}
+              >
+                <span className="font-display text-xl font-bold uppercase text-[#f0d56a] underline underline-offset-2">
+                  Practice Sessions
+                </span>
+                <span className="text-base leading-none text-[#f5c518]" aria-hidden="true">
+                  {practiceOpen ? '▲' : '▼'}
+                </span>
+              </button>
+              {practiceOpen ? renderRaceList(practiceRaces) : null}
+            </section>
+          ) : null}
+          {competitiveRaces.length > 0 ? (
+            <section className="space-y-2">
+              <button
+                type="button"
+                className="inline-flex cursor-pointer items-center gap-2 bg-transparent p-0 text-left"
+                aria-expanded={racesOpen}
+                title={racesOpen ? 'Hide Races' : 'Show Races'}
+                onClick={() => setRacesOpen((open) => !open)}
+              >
+                <span className="font-display text-xl font-bold uppercase text-[#f0d56a] underline underline-offset-2">
+                  Races
+                </span>
+                <span className="text-base leading-none text-[#f5c518]" aria-hidden="true">
+                  {racesOpen ? '▲' : '▼'}
+                </span>
+              </button>
+              {racesOpen ? renderRaceList(competitiveRaces) : null}
+            </section>
+          ) : null}
+        </div>
       ) : null}
 
       {progressOpen && progressName && progressRaceText

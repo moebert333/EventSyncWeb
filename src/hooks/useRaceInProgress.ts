@@ -5,9 +5,9 @@ import type { ActiveRaceTiming, RaceClassName, RaceInProgress, RaceStatus } from
 /** Statuses that still poll for live updates. */
 const LIVE: RaceStatus[] = ['Staging', 'Active', 'Paused']
 const RACE_COLUMNS =
-  'race_num, race_id, event_id, series_id, event_name, session_name, race_date, race_start, description, elapsed_race_time, status'
+  'race_num, race_id, event_id, series_id, event_name, session_name, race_name, is_practice, race_date, race_start, description, elapsed_race_time, status'
 const TIMING_COLUMNS =
-  'event_id, event_name, race_id, race_num, session_name, class_id, class_name, place_num, current_lap_num, status, participant_id, participant_plate, first_name, last_name, current_lap_time, best_lap_num, best_lap_time, race_elapsed_time, leader_gap_time, next_gap_time'
+  'event_id, event_name, race_id, race_num, is_practice, race_name, session_name, class_id, class_name, place_num, current_lap_num, status, participant_id, participant_plate, first_name, last_name, current_lap_time, best_lap_num, best_lap_time, race_elapsed_time, leader_gap_time, next_gap_time'
 
 function isLive(status: RaceStatus | null | undefined): boolean {
   return status != null && LIVE.includes(status)
@@ -24,7 +24,9 @@ export function useRaceInProgress(eventId: number | null) {
         .eq('event_id', eventId!)
         .limit(1)
       if (error) throw error
-      return (data?.[0] ?? null) as RaceInProgress | null
+      const row = data?.[0] as RaceInProgress | undefined
+      if (!row) return null
+      return { ...row, is_practice: Boolean(row.is_practice) }
     },
     // Always poll while an event is selected: empty → pick up a newly active race;
     // Finished → pick up the next Staging/Active race; live → keep header/status fresh.
@@ -45,7 +47,10 @@ export function useLiveTiming(race: RaceInProgress | null | undefined) {
         .eq('race_id', race!.race_id)
         .eq('event_id', race!.event_id)
       if (error) throw error
-      return (data ?? []) as ActiveRaceTiming[]
+      return ((data ?? []) as ActiveRaceTiming[]).map((row) => ({
+        ...row,
+        is_practice: Boolean(row.is_practice),
+      }))
     },
     refetchInterval: live ? 2500 : false,
   })

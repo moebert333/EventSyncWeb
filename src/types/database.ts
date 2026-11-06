@@ -49,6 +49,8 @@ export type RaceInProgress = {
   series_id: number
   event_name: string
   session_name: string
+  race_name: string | null
+  is_practice: boolean
   race_date: string | null
   race_start: string | null
   description: string | null
@@ -61,6 +63,8 @@ export type ActiveRaceTiming = {
   event_name: string
   race_id: number
   race_num: number
+  is_practice: boolean
+  race_name: string | null
   session_name: string
   class_id: number
   class_name: string
@@ -93,6 +97,7 @@ export type EventRaceOrderClass = {
 export type EventRaceOrderRow = {
   race_id: number
   race_num: number
+  is_practice: boolean
   race_name: string | null
   session_name: string | null
   active: boolean
