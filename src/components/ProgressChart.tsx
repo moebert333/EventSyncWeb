@@ -239,7 +239,10 @@ export function ProgressTrackingChart({ riderLabel, points, throughLap }: Props)
   }
 
   return (
-    <div className="border border-white/15 bg-[#141414] px-3 py-3" aria-labelledby={labelId}>
+    <div
+      className="border border-white/15 bg-[#141414] px-2 py-3 max-md:border-x-0 sm:px-3"
+      aria-labelledby={labelId}
+    >
       {riderLabel ? (
         <p id={labelId} className="font-display text-xl font-bold uppercase">
           {riderLabel}
@@ -428,7 +431,7 @@ function ProgressPlot({
 
   useEffect(() => {
     if (!element) return
-    const update = () => setWidth(Math.max(280, Math.floor(element.clientWidth)))
+    const update = () => setWidth(Math.max(1, Math.floor(element.clientWidth)))
     update()
     const observer = new ResizeObserver(update)
     observer.observe(element)
@@ -439,11 +442,14 @@ function ProgressPlot({
   const rightValues = points.flatMap((point) => (point.right == null ? [] : [point.right]))
   const leftScale = axisScale('left', left, leftValues)
   const rightScale = axisScale('right', right, rightValues)
+  // Keep axis gutters tight on narrow screens so the plot uses the full width.
+  const compact = width > 0 && width < 480
+  const tickFont = compact ? 10 : 12
   const pad = {
-    left: left.kind === 'time' ? 84 : 56,
-    right: right.kind === 'time' ? 88 : 48,
-    top: 28,
-    bottom: 36,
+    left: left.kind === 'time' ? (compact ? 50 : 84) : compact ? 30 : 56,
+    right: right.kind === 'time' ? (compact ? 54 : 88) : compact ? 28 : 48,
+    top: compact ? 22 : 28,
+    bottom: compact ? 30 : 36,
   }
   const innerW = Math.max(40, width - pad.left - pad.right)
   const innerH = HEIGHT - pad.top - pad.bottom
@@ -457,7 +463,7 @@ function ProgressPlot({
 
   const xOf = (lap: number) => {
     if (xMaxLap === xMinLap) return pad.left + innerW / 2
-    const inset = Math.min(16, innerW / 8)
+    const inset = Math.min(compact ? 6 : 16, innerW / 8)
     return pad.left + inset + ((lap - xMinLap) / (xMaxLap - xMinLap)) * (innerW - inset * 2)
   }
 
@@ -536,10 +542,16 @@ function ProgressPlot({
             onPointerMove={(event) => setHover(findHover(event.clientX, event.clientY, event.currentTarget))}
             onPointerLeave={() => setHover(null)}
           >
-            <text x={pad.left} y={16} fill={LEFT_COLOR} fontSize="12" textAnchor="start">
+            <text x={pad.left} y={compact ? 14 : 16} fill={LEFT_COLOR} fontSize={tickFont} textAnchor="start">
               {left.label}
             </text>
-            <text x={width - pad.right} y={16} fill={RIGHT_COLOR} fontSize="12" textAnchor="end">
+            <text
+              x={width - pad.right}
+              y={compact ? 14 : 16}
+              fill={RIGHT_COLOR}
+              fontSize={tickFont}
+              textAnchor="end"
+            >
               {right.label}
             </text>
             {leftScale.ticks.map((tick) => {
@@ -547,7 +559,13 @@ function ProgressPlot({
               return (
                 <g key={`left-${tick}`}>
                   <line x1={pad.left} x2={width - pad.right} y1={y} y2={y} stroke="rgb(255 255 255 / 0.08)" />
-                  <text x={pad.left - 8} y={y + 4} textAnchor="end" fill={leftScale.tickColor} fontSize="12">
+                  <text
+                    x={pad.left - 6}
+                    y={y + 3}
+                    textAnchor="end"
+                    fill={leftScale.tickColor}
+                    fontSize={tickFont}
+                  >
                     {formatMetric(tick, left.kind)}
                   </text>
                 </g>
@@ -556,10 +574,10 @@ function ProgressPlot({
             {rightScale.ticks.map((tick) => (
               <text
                 key={`right-${tick}`}
-                x={width - pad.right + 8}
-                y={yOf(rightScale, tick) + 4}
+                x={width - pad.right + 6}
+                y={yOf(rightScale, tick) + 3}
                 fill={rightScale.tickColor}
-                fontSize="12"
+                fontSize={tickFont}
               >
                 {formatMetric(tick, right.kind)}
               </text>
@@ -567,12 +585,25 @@ function ProgressPlot({
             <line x1={pad.left} x2={pad.left} y1={top} y2={bottom} stroke="#a1a1aa" />
             <line x1={width - pad.right} x2={width - pad.right} y1={top} y2={bottom} stroke="#7dd3fc" />
             <line x1={pad.left} x2={width - pad.right} y1={bottom} y2={bottom} stroke="#a1a1aa" />
-            <text x={pad.left + innerW / 2} y={HEIGHT - 8} fill="#a1a1aa" fontSize="12" textAnchor="middle">
+            <text
+              x={pad.left + innerW / 2}
+              y={HEIGHT - 6}
+              fill="#a1a1aa"
+              fontSize={tickFont}
+              textAnchor="middle"
+            >
               Lap
             </text>
             {axisLaps.map((lap, index) =>
               index % lapStep === 0 || lap === xMaxLap ? (
-                <text key={lap} x={xOf(lap)} y={bottom + 16} fill="#d4d4d8" fontSize="12" textAnchor="middle">
+                <text
+                  key={lap}
+                  x={xOf(lap)}
+                  y={bottom + (compact ? 14 : 16)}
+                  fill="#d4d4d8"
+                  fontSize={tickFont}
+                  textAnchor="middle"
+                >
                   {lap}
                 </text>
               ) : null,

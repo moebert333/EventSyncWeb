@@ -619,7 +619,7 @@ export function RacesInProgressPage() {
         </div>
         <RaceStatusVideo status={race.status} showVideo={videoOpen} />
         {chartOpen ? (
-          <div id="progress-chart" className="mt-4">
+          <div id="progress-chart" className="mt-4 max-md:-mx-4">
             <ProgressTrackingChart
               riderLabel={chartRow ? `${riderName(chartRow.first_name, chartRow.last_name)} · ${chartRow.class_name}` : ''}
               points={chartPoints}

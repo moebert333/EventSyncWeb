@@ -292,7 +292,7 @@ export function raceProgressParts(line: RaceProgressLine): {
   if (line.kind === 'first') {
     return {
       title: null,
-      detail: titleCaseProgressLine(`Your first ${unit} is number ${line.raceNum}.`),
+      detail: titleCaseProgressLine(`Your first ${unit} is ${line.raceNum}.`),
     }
   }
   const title = `Active ${Unit} ${line.activeNum}`
@@ -303,13 +303,13 @@ export function raceProgressParts(line: RaceProgressLine): {
     return {
       title,
       detail: titleCaseProgressLine(
-        `You are in this ${Unit}!  Your next ${unit} is number ${line.nextNum}.`,
+        `You are in this ${Unit}!  Your next ${unit} is ${line.nextNum}.`,
       ),
     }
   }
   return {
     title,
-    detail: titleCaseProgressLine(`Your next ${unit} is number ${line.nextNum}`),
+    detail: titleCaseProgressLine(`Your next ${unit} is ${line.nextNum}`),
   }
 }
 
