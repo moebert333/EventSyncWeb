@@ -29,6 +29,12 @@ const bannerLinkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'bg-[#f5c518]/20 text-[#f5c518]' : 'text-zinc-300 hover:bg-white/5'
   }`
 
+function linkMatchesPath(link: (typeof links)[number], pathname: string): boolean {
+  return link.end
+    ? pathname === link.to
+    : pathname === link.to || pathname.startsWith(`${link.to}/`)
+}
+
 export function Header() {
   const location = useLocation()
   const simulation = useSimulationOptional()
@@ -43,7 +49,15 @@ export function Header() {
   const measureRef = useRef<HTMLDivElement>(null)
   const rafFit = useRef<number | null>(null)
 
-  const overflowLinks = links.slice(visibleCount)
+  const currentLink = links.find((link) => linkMatchesPath(link, location.pathname)) ?? null
+  // When only one slot fits, prefer the current page over the first menu item.
+  const bannerLinks =
+    visibleCount <= 0
+      ? []
+      : visibleCount === 1
+        ? [currentLink ?? links[0]!]
+        : links.slice(0, visibleCount)
+  const overflowLinks = links.filter((link) => !bannerLinks.some((shown) => shown.to === link.to))
   const needsHamburger = overflowLinks.length > 0
 
   useEffect(() => {
@@ -91,9 +105,19 @@ export function Header() {
       // Always reserve hamburger width when deciding capacity. Show all (and hide
       // the button) only if every item still fits in that reduced space — avoids
       // scrollbar / subpixel thrash that oscillates hamburger on/off.
-      const reserved = spaceAfterBrand - SECTION_GAP_PX - HAMBURGER_WIDTH_PX
-      const fitting = countFitting(Math.max(0, reserved))
-      const next = fitting >= links.length ? links.length : fitting
+      const reserved = Math.max(0, spaceAfterBrand - SECTION_GAP_PX - HAMBURGER_WIDTH_PX)
+      const fitting = countFitting(reserved)
+      let next: number
+      if (fitting >= links.length) {
+        next = links.length
+      } else if (fitting <= 1) {
+        // At most one banner slot: ensure the current page label itself fits.
+        const currentIdx = links.findIndex((link) => linkMatchesPath(link, location.pathname))
+        const soloWidth = itemWidths[currentIdx >= 0 ? currentIdx : 0]!
+        next = soloWidth <= reserved + 0.5 ? 1 : 0
+      } else {
+        next = fitting
+      }
       setVisibleCount((prev) => (prev === next ? prev : next))
     }
 
@@ -115,7 +139,7 @@ export function Header() {
       observer.disconnect()
       if (rafFit.current != null) window.cancelAnimationFrame(rafFit.current)
     }
-  }, [])
+  }, [location.pathname])
 
   function clearLongPress() {
     if (longPressTimer.current != null) {
@@ -179,7 +203,7 @@ export function Header() {
         </NavLink>
 
         <nav className="flex min-w-0 items-center gap-1" aria-label="Primary">
-          {links.slice(0, visibleCount).map((link) => (
+          {bannerLinks.map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
