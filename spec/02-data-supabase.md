@@ -62,6 +62,10 @@ Function `place_label(pos int)`: `NULL` → null; `> 80` → `DNS/DNF`; else pos
 
 `race_in_progress` already joins `races` + `events` + `status` where `races.active` is true and status ∈ (`Staging`, `Active`, `Paused`, `Finished`). Finished stays in the view so the live page can keep showing that race and its `active_race_timing` rows until the race is no longer active.
 
+### Simulation mode (no writes)
+
+Client-only Active Race demo (`03-ui.md` §3b) may **read** entrants via `active_race_participants` (or `race_class` + `event_entry` + `participants`) and race metadata for the current event. It must **not** write `active_timing`, `status`, `races`, or any other race/timing table. While simulating, `/live` hooks serve in-memory rows shaped like `race_in_progress` / `active_race_timing` instead of polling those views for that event.
+
 ## Schema additions required for this website
 
 Apply in Supabase SQL editor (keep in `supabase/migrations/` in the repo).

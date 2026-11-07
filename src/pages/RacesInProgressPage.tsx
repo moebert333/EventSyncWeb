@@ -8,6 +8,7 @@ import { StatusPill } from '../components/StatusPill'
 import { useEventCode } from '../hooks/useEventCode'
 import { useLiveTiming, useRaceClassNames, useRaceInProgress } from '../hooks/useRaceInProgress'
 import { useElapsedRaceClock } from '../hooks/useElapsedRaceClock'
+import { useSimulationOptional } from '../lib/simulationContext'
 import {
   bestLapLabel,
   formatClock,
@@ -247,6 +248,8 @@ let rememberedRaceStatus: RaceStatus | null = null
 
 export function RacesInProgressPage() {
   const { context, selectedParticipant } = useEventCode()
+  const simulation = useSimulationOptional()
+  const simulating = Boolean(simulation?.isActive)
   const raceQuery = useRaceInProgress(context?.eventId ?? null)
   const live = raceQuery.data?.status != null && LIVE.includes(raceQuery.data.status)
   const timingQuery = useLiveTiming(raceQuery.data)
@@ -384,14 +387,16 @@ export function RacesInProgressPage() {
   if (raceQuery.isLoading) {
     return (
       <div className="space-y-5">
-        <EventParticipantHeader
-          eventId={context.eventId}
-          eventName={context.eventName}
-          pageTitle="Active Race"
-          onParticipantChanged={() => {
-            appliedParticipantRaceRef.current = null
-          }}
-        />
+        {!simulating ? (
+          <EventParticipantHeader
+            eventId={context.eventId}
+            eventName={context.eventName}
+            pageTitle="Active Race"
+            onParticipantChanged={() => {
+              appliedParticipantRaceRef.current = null
+            }}
+          />
+        ) : null}
         <Skeleton />
       </div>
     )
@@ -400,14 +405,16 @@ export function RacesInProgressPage() {
   if (raceQuery.error) {
     return (
       <div className="space-y-5">
-        <EventParticipantHeader
-          eventId={context.eventId}
-          eventName={context.eventName}
-          pageTitle="Active Race"
-          onParticipantChanged={() => {
-            appliedParticipantRaceRef.current = null
-          }}
-        />
+        {!simulating ? (
+          <EventParticipantHeader
+            eventId={context.eventId}
+            eventName={context.eventName}
+            pageTitle="Active Race"
+            onParticipantChanged={() => {
+              appliedParticipantRaceRef.current = null
+            }}
+          />
+        ) : null}
         <div className="panel" role="alert">
           <p>{raceQuery.error instanceof Error ? raceQuery.error.message : 'Could not load the live race.'}</p>
           <button
@@ -427,14 +434,16 @@ export function RacesInProgressPage() {
   if (!race) {
     return (
       <div className="space-y-5">
-        <EventParticipantHeader
-          eventId={context.eventId}
-          eventName={context.eventName}
-          pageTitle="Active Race"
-          onParticipantChanged={() => {
-            appliedParticipantRaceRef.current = null
-          }}
-        />
+        {!simulating ? (
+          <EventParticipantHeader
+            eventId={context.eventId}
+            eventName={context.eventName}
+            pageTitle="Active Race"
+            onParticipantChanged={() => {
+              appliedParticipantRaceRef.current = null
+            }}
+          />
+        ) : null}
         <div className="panel">
           <h1 className="font-display text-4xl font-extrabold uppercase">Races in progress</h1>
           <p className="mt-3 text-lg">No race is staging or on track right now.</p>
@@ -527,14 +536,16 @@ export function RacesInProgressPage() {
 
   return (
     <div className="space-y-5">
-      <EventParticipantHeader
-        eventId={context.eventId}
-        eventName={race.event_name || context.eventName}
-        pageTitle={race.is_practice ? 'Active Practice' : 'Active Race'}
-        onParticipantChanged={() => {
-          appliedParticipantRaceRef.current = null
-        }}
-      />
+      {!simulating ? (
+        <EventParticipantHeader
+          eventId={context.eventId}
+          eventName={race.event_name || context.eventName}
+          pageTitle={race.is_practice ? 'Active Practice' : 'Active Race'}
+          onParticipantChanged={() => {
+            appliedParticipantRaceRef.current = null
+          }}
+        />
+      ) : null}
       <header className="border-b border-[#f5c518] pb-4">
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="font-display text-4xl font-extrabold uppercase">

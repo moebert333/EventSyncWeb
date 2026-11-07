@@ -93,6 +93,21 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] A newly detected race while the page is open closes the chart and opens the status video (when available)
 - [ ] Scoped to Event Code’s event (or series fallback as in data spec)
 
+## F2. Simulation mode
+
+- [ ] Simulation can only be started on Active Race (`/live`); Ctrl+click / long-press off that page explains to go to Active Race
+- [ ] Ctrl+click or long-press (~1.8s) EventSync brand opens the simulation dialog; normal click / short tap still goes Home
+- [ ] Dialog lists current-event **races only** (no practices); requires Event Code context
+- [ ] Approx. lap time defaults to 15s; valid range 2–120s with validation / clamp
+- [ ] Ok starts client-only simulation on `/live` and does **not** write `active_timing` / status / races
+- [ ] At start, each entrant has a lap-0 zero/empty timing row until the first lap is recorded
+- [ ] Live page shows simulated timing with realistic place / lap-time variation; prior lap rows stay frozen
+- [ ] While simulating, Simulation banner is shown and the Active Race participant header strip is hidden
+- [ ] Banner shows Pause / Continue / Stop; Pause freezes clock and crossings (status Paused); Continue resumes from the same elapsed
+- [ ] Leaving `/live` while simulating prompts “Simulation will be Cancelled” with Ok (stop + navigate) / Cancel (stay)
+- [ ] Stop (banner or dialog) returns `/live` to real Supabase data and restores the Active Race header
+- [ ] Race Order / Results / Staging alerts are unaffected by simulation DB writes (none occur)
+
 ## G. Completed Races
 
 - [ ] Org name read-only from Event Code

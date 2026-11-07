@@ -25,10 +25,14 @@ EventSync is a public website and installable PWA for racers and spectators at a
 6. Install the site on a phone home screen and reopen it without signing in (public pages).
 7. An allowlisted organizer signs in with a magic link and creates/edits organization, series, events, and Event Codes.
 
+## Simulation mode (demo / development)
+
+Hidden client-only mode for demonstrating Active Race without a live track feed. Started from the public header (Ctrl+click the EventSync brand). It synthesizes `race_in_progress` / `active_race_timing`-shaped data in memory for a chosen event race so `/live` behaves as if a race were running. It must **never** write timing, status, or race rows to Supabase. Full UI rules: `03-ui.md` (Simulation mode).
+
 ## Non-goals (this spec)
 
 - Sign-in for racers or spectators
-- Editing timing, entries, or results from the website (source of truth is the local race app)
+- Editing timing, entries, or results from the website (source of truth is the local race app; simulation is in-memory only and does not count as writing)
 - Native App Store / Play Store apps
 - Server-side rendering / Next.js / custom Express backend
 - Offline-first sync of live timing

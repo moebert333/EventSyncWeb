@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useSimulationOptional } from '../lib/simulationContext'
 import { supabase } from '../lib/supabase'
 import type { ActiveRaceTiming, RaceClassName, RaceInProgress, RaceStatus } from '../types/database'
 
@@ -14,9 +15,12 @@ function isLive(status: RaceStatus | null | undefined): boolean {
 }
 
 export function useRaceInProgress(eventId: number | null) {
-  return useQuery({
+  const simulation = useSimulationOptional()
+  const simulating = Boolean(simulation?.isActive && simulation.eventId === eventId)
+
+  const query = useQuery({
     queryKey: ['race-in-progress', eventId],
-    enabled: eventId != null,
+    enabled: eventId != null && !simulating,
     queryFn: async (): Promise<RaceInProgress | null> => {
       const { data, error } = await supabase
         .from('race_in_progress')
@@ -30,16 +34,41 @@ export function useRaceInProgress(eventId: number | null) {
     },
     // Always poll while an event is selected: empty → pick up a newly active race;
     // Finished → pick up the next Staging/Active race; live → keep header/status fresh.
-    refetchInterval: 2500,
+    refetchInterval: simulating ? false : 2500,
   })
+
+  if (simulating && simulation) {
+    return {
+      ...query,
+      data: simulation.raceInProgress,
+      error: null,
+      isError: false,
+      isLoading: false,
+      isPending: false,
+      isSuccess: true,
+      status: 'success' as const,
+      isFetching: false,
+      isFetched: true,
+      fetchStatus: 'idle' as const,
+    }
+  }
+  return query
 }
 
 export function useLiveTiming(race: RaceInProgress | null | undefined) {
+  const simulation = useSimulationOptional()
+  const simulating = Boolean(
+    simulation?.isActive &&
+      race != null &&
+      simulation.eventId === race.event_id &&
+      simulation.raceInProgress?.race_id === race.race_id,
+  )
   const live = isLive(race?.status)
-  return useQuery({
+
+  const query = useQuery({
     queryKey: ['active-race-timing', race?.race_id],
     // Fetch whenever the race is shown, including Finished (timing rows remain).
-    enabled: race != null,
+    enabled: race != null && !simulating,
     queryFn: async (): Promise<ActiveRaceTiming[]> => {
       const { data, error } = await supabase
         .from('active_race_timing')
@@ -52,8 +81,25 @@ export function useLiveTiming(race: RaceInProgress | null | undefined) {
         is_practice: Boolean(row.is_practice),
       }))
     },
-    refetchInterval: live ? 2500 : false,
+    refetchInterval: simulating ? false : live ? 2500 : false,
   })
+
+  if (simulating && simulation) {
+    return {
+      ...query,
+      data: simulation.timingRows,
+      error: null,
+      isError: false,
+      isLoading: false,
+      isPending: false,
+      isSuccess: true,
+      status: 'success' as const,
+      isFetching: false,
+      isFetched: true,
+      fetchStatus: 'idle' as const,
+    }
+  }
+  return query
 }
 
 export function useRaceClassNames(raceId: number | null, live: boolean) {

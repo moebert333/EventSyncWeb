@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useSimulationOptional } from '../lib/simulationContext'
 
 const links = [
   { to: '/order', label: 'Race Order', title: 'View race order for this event', end: false },
@@ -8,10 +9,32 @@ const links = [
   { to: '/stream', label: 'Live Stream', title: 'View live stream (coming soon)', end: false },
 ]
 
+/** Hold duration to open simulation (touch / pointer analogue to Ctrl+click). */
+const SIM_LONG_PRESS_MS = 1800
+
 export function Header() {
   const location = useLocation()
+  const simulation = useSimulationOptional()
   const [menuPath, setMenuPath] = useState<string | null>(null)
   const open = menuPath === location.pathname
+  const longPressTimer = useRef<number | null>(null)
+  const suppressBrandClick = useRef(false)
+
+  function clearLongPress() {
+    if (longPressTimer.current != null) {
+      window.clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  function openSimulationFromBrand(event: { preventDefault: () => void; stopPropagation: () => void }) {
+    if (!simulation) return
+    event.preventDefault()
+    event.stopPropagation()
+    suppressBrandClick.current = true
+    clearLongPress()
+    simulation.openDialog()
+  }
 
   return (
     <header
@@ -19,8 +42,38 @@ export function Header() {
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2">
-        <NavLink to="/" className="flex min-h-11 shrink-0 items-center gap-2" title="Go to Home">
-          <img src="/rider.svg" alt="" className="h-10 w-14" />
+        <NavLink
+          to="/"
+          className="flex min-h-11 shrink-0 touch-manipulation items-center gap-2 select-none"
+          title="Go to Home (Ctrl+click or long-press on Active Race for simulation)"
+          onClick={(event) => {
+            if (suppressBrandClick.current) {
+              event.preventDefault()
+              event.stopPropagation()
+              suppressBrandClick.current = false
+              return
+            }
+            if (!event.ctrlKey || !simulation) return
+            openSimulationFromBrand(event)
+          }}
+          onPointerDown={(event) => {
+            if (!simulation || event.button !== 0) return
+            clearLongPress()
+            longPressTimer.current = window.setTimeout(() => {
+              longPressTimer.current = null
+              suppressBrandClick.current = true
+              simulation.openDialog()
+            }, SIM_LONG_PRESS_MS)
+          }}
+          onPointerUp={clearLongPress}
+          onPointerLeave={clearLongPress}
+          onPointerCancel={clearLongPress}
+          onContextMenu={(event) => {
+            // Avoid the native callout stealing a long-press meant for simulation.
+            if (simulation) event.preventDefault()
+          }}
+        >
+          <img src="/rider.svg" alt="" className="h-10 w-14" draggable={false} />
           <span className="font-display text-2xl font-extrabold uppercase tracking-wide">EventSync</span>
         </NavLink>
 

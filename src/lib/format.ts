@@ -38,6 +38,18 @@ export function formatElapsedSeconds(totalSeconds: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
+/** Seconds → Postgres `time` string (`HH:MM:SS` or `HH:MM:SS.xx`). */
+export function secondsToRaceTime(totalSeconds: number, withHundredths = true): string {
+  const safe = Math.max(0, totalSeconds)
+  const hours = Math.floor(safe / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  const wholeSeconds = Math.floor(safe % 60)
+  const hundredths = Math.round((safe - Math.floor(safe)) * 100)
+  const base = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(wholeSeconds).padStart(2, '0')}`
+  if (!withHundredths || hundredths === 0) return base
+  return `${base}.${String(Math.min(99, hundredths)).padStart(2, '0')}`
+}
+
 /** Postgres `time` truncated to whole seconds as HH:MM:SS. */
 export function formatElapsedRaceTime(value: string | null | undefined): string {
   if (!value) return '—'
