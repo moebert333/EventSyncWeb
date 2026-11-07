@@ -230,11 +230,13 @@ function highlightRow(
 
 /**
  * Survives /live remounts so chart vs video and class chip stay as left.
- * Chart/video switches to Video only when race status changes (not on page return).
+ * First visit defaults to Video open; later returns restore the last choice.
+ * Chart/video also switches to Video when race status changes (including while away).
  */
 let rememberedPanelEventId: number | null = null
 let rememberedPanelRaceId: number | null | undefined = undefined
-let rememberedVideoOpen = false
+/** True until the user hides video or opens the chart — so first /live visit shows video. */
+let rememberedVideoOpen = true
 let rememberedChartOpen = false
 let rememberedPickedClass: string | null = null
 let rememberedAllClasses = false
