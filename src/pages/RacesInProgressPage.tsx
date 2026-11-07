@@ -307,14 +307,26 @@ export function RacesInProgressPage() {
     hideLongPressOrigin.current = null
   }
 
+  function clearTextSelection() {
+    const selection = window.getSelection()
+    if (selection == null || selection.rangeCount === 0) return
+    selection.removeAllRanges()
+  }
+
   function hideMedia(kind: 'chart' | 'video') {
+    clearTextSelection()
     if (kind === 'chart') {
       rememberedChartOpen = false
       setChartOpen(false)
-      return
+    } else {
+      rememberedVideoOpen = false
+      setVideoOpen(false)
     }
-    rememberedVideoOpen = false
-    setVideoOpen(false)
+    // Long-press can leave a selection on content revealed after hide.
+    requestAnimationFrame(() => {
+      clearTextSelection()
+      window.setTimeout(clearTextSelection, 0)
+    })
   }
 
   function hideMediaLongPressHandlers(kind: 'chart' | 'video') {
@@ -322,6 +334,7 @@ export function RacesInProgressPage() {
       onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
         if (event.button !== 0) return
         clearHideLongPress()
+        clearTextSelection()
         hideLongPressOrigin.current = { x: event.clientX, y: event.clientY }
         hideLongPressTimer.current = window.setTimeout(() => {
           hideLongPressTimer.current = null
@@ -344,6 +357,11 @@ export function RacesInProgressPage() {
       onContextMenu: (event: { preventDefault: () => void }) => {
         event.preventDefault()
       },
+      style: {
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        WebkitTouchCallout: 'none',
+      } as const,
     }
   }
 
@@ -698,7 +716,7 @@ export function RacesInProgressPage() {
         </div>
         {videoOpen ? (
           <div
-            className="select-none touch-manipulation"
+            className="select-none touch-manipulation [&_*]:select-none"
             title="Long-press to hide video"
             {...hideMediaLongPressHandlers('video')}
           >
@@ -708,7 +726,7 @@ export function RacesInProgressPage() {
         {chartOpen ? (
           <div
             id="progress-chart"
-            className="mt-4 max-md:-mx-4 select-none touch-manipulation"
+            className="mt-4 max-md:-mx-4 select-none touch-manipulation [&_*]:select-none"
             title="Long-press to hide chart"
             {...hideMediaLongPressHandlers('chart')}
           >
