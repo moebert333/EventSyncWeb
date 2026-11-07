@@ -108,7 +108,8 @@ export function HomePage() {
               <input
                 ref={inputRef}
                 id="event-code-input"
-                className={`control ${needCode || error ? 'outline outline-2 outline-[#f5c518]' : ''}`}
+                className="control outline outline-2 outline-[#f5c518]"
+                placeholder="Event Code"
                 value={draft}
                 maxLength={12}
                 autoCapitalize="off"
