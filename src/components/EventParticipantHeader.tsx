@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { useEventCode } from '../hooks/useEventCode'
 import {
   raceProgressLine,
@@ -84,9 +85,13 @@ export function EventParticipantHeader({
         <div className="flex min-h-[1.75rem] items-center gap-x-3">
           <p className="shrink-0 text-xl font-bold leading-tight text-green-500">{titleLabel}</p>
           {statusDetail ? (
-            <p className="min-w-0 flex-1 text-right text-lg font-semibold leading-tight text-zinc-300 sm:text-center">
+            <Link
+              to="/order"
+              className="min-w-0 flex-1 text-right text-lg font-semibold leading-tight text-[#f0d56a] underline underline-offset-2 sm:text-center"
+              title="Go to Race Order"
+            >
               {statusDetail}
-            </p>
+            </Link>
           ) : null}
         </div>
         <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-lg font-bold leading-tight">

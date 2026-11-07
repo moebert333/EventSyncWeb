@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSimulationOptional } from '../lib/simulationContext'
 
@@ -12,6 +12,9 @@ const links = [
 /** Hold duration to open simulation (touch / pointer analogue to Ctrl+click). */
 const SIM_LONG_PRESS_MS = 1800
 
+/** Ignore hamburger taps briefly after a route change (mobile click-through). */
+const MENU_NAV_GUARD_MS = 450
+
 export function Header() {
   const location = useLocation()
   const simulation = useSimulationOptional()
@@ -19,6 +22,12 @@ export function Header() {
   const open = menuPath === location.pathname
   const longPressTimer = useRef<number | null>(null)
   const suppressBrandClick = useRef(false)
+  const menuNavGuardUntil = useRef(0)
+
+  useEffect(() => {
+    setMenuPath(null)
+    menuNavGuardUntil.current = Date.now() + MENU_NAV_GUARD_MS
+  }, [location.pathname])
 
   function clearLongPress() {
     if (longPressTimer.current != null) {
@@ -104,7 +113,10 @@ export function Header() {
           aria-controls="site-nav"
           aria-label={open ? 'Close menu' : 'Open menu'}
           title={open ? 'Close menu' : 'Open menu'}
-          onClick={() => setMenuPath(open ? null : location.pathname)}
+          onClick={() => {
+            if (Date.now() < menuNavGuardUntil.current) return
+            setMenuPath(open ? null : location.pathname)
+          }}
         >
           {open ? (
             <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
