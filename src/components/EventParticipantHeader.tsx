@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { useEventCode } from '../hooks/useEventCode'
 import {
   raceProgressLine,
-  raceProgressMessage,
+  raceProgressParts,
   stagingInRaces,
   stagingLabelText,
   useEventRaceOrder,
@@ -51,8 +51,9 @@ export function EventParticipantHeader({
     selectedForEvent && racesQuery.data && participantRacesQuery.data
       ? raceProgressLine(racesQuery.data, participantRacesQuery.data)
       : null
-  const progressMessage = progressLine ? raceProgressMessage(progressLine) : null
-  const progressActivePrefix = progressLine?.isPractice ? 'Active Practice:' : 'Active Race:'
+  const progressParts = progressLine ? raceProgressParts(progressLine) : null
+  const titleLabel = progressParts?.title ?? pageTitle
+  const statusDetail = progressParts?.detail ?? null
 
   const participantLabel = selectedForEvent
     ? `${riderName(selectedForEvent.firstName, selectedForEvent.lastName)}${
@@ -80,7 +81,14 @@ export function EventParticipantHeader({
       className={`sticky ${STICKY_TOP} z-20 -mx-4 -mt-6 border-b border-[#f5c518]/35 bg-[#252525] px-4 py-2 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]`}
     >
       <div className="space-y-1">
-        <p className="text-xl font-bold leading-tight text-green-500">{pageTitle}</p>
+        <div className="relative flex min-h-[1.75rem] items-center">
+          <p className="relative z-10 text-xl font-bold leading-tight text-green-500">{titleLabel}</p>
+          {statusDetail ? (
+            <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-lg font-semibold leading-tight text-zinc-300">
+              <span className="max-w-[min(100%,36rem)]">{statusDetail}</span>
+            </p>
+          ) : null}
+        </div>
         <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-lg font-bold leading-tight">
           <span>
             <span className="text-zinc-400">Event:</span> <span className="text-white">{eventName}</span>
@@ -100,18 +108,6 @@ export function EventParticipantHeader({
             {stagingLabel != null ? <span className={stagingClass}>{stagingLabel}</span> : null}
           </span>
         </p>
-        {progressMessage ? (
-          <p className="text-lg font-semibold leading-tight text-zinc-300">
-            {progressMessage.startsWith(progressActivePrefix) ? (
-              <>
-                <span className="text-zinc-400">{progressActivePrefix}</span>
-                {progressMessage.slice(progressActivePrefix.length)}
-              </>
-            ) : (
-              progressMessage
-            )}
-          </p>
-        ) : null}
         {picking ? (
           <SelectParticipantBox eventId={eventId} onOk={finishPick} onSkip={finishPick} />
         ) : null}

@@ -282,23 +282,41 @@ export function raceProgressLine(
   return { kind: 'active', activeNum: activeRace.race_num, nextNum, isPractice }
 }
 
-export function raceProgressMessage(line: RaceProgressLine): string {
+/** Title like "Active Race 1" plus the remaining status detail for the header strip. */
+export function raceProgressParts(line: RaceProgressLine): {
+  title: string | null
+  detail: string
+} {
   const unit = sessionWord(line.isPractice, false)
   const Unit = sessionWord(line.isPractice, true)
   if (line.kind === 'first') {
-    return titleCaseProgressLine(`Your first ${unit} is number ${line.raceNum}.`)
+    return {
+      title: null,
+      detail: titleCaseProgressLine(`Your first ${unit} is number ${line.raceNum}.`),
+    }
   }
+  const title = `Active ${Unit} ${line.activeNum}`
   if (line.kind === 'inThisRace') {
-    return titleCaseProgressLine(`Active ${Unit}: ${line.activeNum}, you are in this ${Unit}!`)
+    return { title, detail: titleCaseProgressLine(`You are in this ${Unit}!`) }
   }
   if (line.kind === 'inThisRaceWithNext') {
-    return titleCaseProgressLine(
-      `Active ${Unit}: ${line.activeNum}, you are in this ${Unit}!  Your next ${unit} is number ${line.nextNum}.`,
-    )
+    return {
+      title,
+      detail: titleCaseProgressLine(
+        `You are in this ${Unit}!  Your next ${unit} is number ${line.nextNum}.`,
+      ),
+    }
   }
-  return titleCaseProgressLine(
-    `Active ${Unit}: ${line.activeNum}, your next ${unit} is number ${line.nextNum}`,
-  )
+  return {
+    title,
+    detail: titleCaseProgressLine(`Your next ${unit} is number ${line.nextNum}`),
+  }
+}
+
+export function raceProgressMessage(line: RaceProgressLine): string {
+  const parts = raceProgressParts(line)
+  if (parts.title == null) return parts.detail
+  return `${parts.title}, ${parts.detail}`
 }
 
 export type StagingInResult = number | 'completed' | 'inThisRace' | null

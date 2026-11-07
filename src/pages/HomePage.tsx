@@ -108,10 +108,10 @@ export function HomePage() {
               <input
                 ref={inputRef}
                 id="event-code-input"
-                className={`control uppercase ${needCode || error ? 'outline outline-2 outline-[#f5c518]' : ''}`}
+                className={`control ${needCode || error ? 'outline outline-2 outline-[#f5c518]' : ''}`}
                 value={draft}
                 maxLength={12}
-                autoCapitalize="characters"
+                autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck={false}
                 aria-invalid={error ? true : undefined}
@@ -162,7 +162,7 @@ export function HomePage() {
                     {[dateLabel, place].filter(Boolean).join(' · ')}
                   </span>
                 ) : null}
-                <span className="text-xs uppercase tracking-widest text-zinc-500">{context.code}</span>
+                <span className="text-xs tracking-widest text-zinc-500">{context.code}</span>
               </button>
 
               {promptParticipant ? (

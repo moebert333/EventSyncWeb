@@ -539,6 +539,9 @@ export function RacesInProgressPage() {
             {formatRaceTitle(race.race_num, race.is_practice, race.race_name)}
           </h1>
           <StatusPill status={race.status} />
+          {race.status === 'Active' || race.status === 'Paused' || race.status === 'Finished' ? (
+            <p className="text-lg font-semibold tabular-nums">Elapsed Time: {elapsedDisplay}</p>
+          ) : null}
           <div className="ml-auto flex items-center gap-3 pr-2">
             <button
               type="button"
@@ -612,78 +615,51 @@ export function RacesInProgressPage() {
           </div>
         ) : null}
         {classNames.length > 0 ? (
-          <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Race classes">
-            {classNames.map((name) => {
-              const selected = name === activeClass
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  aria-pressed={selected}
-                  title={`Show ${name} timing`}
-                  className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
-                    selected ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
-                  }`}
-                  onClick={() => {
-                    rememberedAllClasses = false
-                    rememberedPickedClass = name
-                    setAllClasses(false)
-                    setPickedClass(name)
-                    setSort((current) => (current.column === 'class' ? PLACE_SORT : current))
-                  }}
-                >
-                  {name}
-                </button>
-              )
-            })}
-            <button
-              type="button"
-              aria-pressed={showingAll}
-              title="Show timing for all classes"
-              className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
-                showingAll ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
-              }`}
-              onClick={() => {
-                rememberedAllClasses = true
-                setAllClasses(true)
-                setSort(DEFAULT_SORT)
-              }}
-            >
-              All Classes
-            </button>
-          </div>
-        ) : null}
-      </header>
-
-      {timingQuery.isLoading ? <Skeleton /> : null}
-      {timingQuery.error ? (
-        <div className="panel" role="alert">
-          <p>{timingQuery.error instanceof Error ? timingQuery.error.message : 'Could not load timing.'}</p>
-          <button
-            type="button"
-            className="btn mt-4"
-            title="Retry loading timing"
-            onClick={() => void timingQuery.refetch()}
-          >
-            Retry
-          </button>
-        </div>
-      ) : null}
-      {!timingQuery.isLoading && !timingQuery.error && classNames.length === 0 ? (
-        <p className="panel">No timing rows for this race yet.</p>
-      ) : null}
-
-      {!timingQuery.isLoading && !timingQuery.error && (showingAll || activeClass) ? (
-        <section aria-label={sectionLabel ?? undefined}>
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="font-display text-2xl font-bold uppercase">{sectionLabel}</h2>
-            <p className="text-lg font-semibold tabular-nums">
-              Elapsed Time: {elapsedDisplay}
-            </p>
-            <div className="relative ml-auto" ref={highlightMenuRef}>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Race classes">
+              {classNames.map((name) => {
+                const selected = name === activeClass
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    aria-pressed={selected}
+                    title={`Show ${name} timing`}
+                    className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
+                      selected ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
+                    }`}
+                    onClick={() => {
+                      rememberedAllClasses = false
+                      rememberedPickedClass = name
+                      setAllClasses(false)
+                      setPickedClass(name)
+                      setSort((current) => (current.column === 'class' ? PLACE_SORT : current))
+                    }}
+                  >
+                    {name}
+                  </button>
+                )
+              })}
               <button
                 type="button"
-                className="inline-flex min-h-8 cursor-pointer items-center bg-[#c9efd4] px-3 text-sm font-bold text-black"
+                aria-pressed={showingAll}
+                title="Show timing for all classes"
+                className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
+                  showingAll ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
+                }`}
+                onClick={() => {
+                  rememberedAllClasses = true
+                  setAllClasses(true)
+                  setSort(DEFAULT_SORT)
+                }}
+              >
+                All Classes
+              </button>
+            </div>
+            <div className="relative ml-auto shrink-0" ref={highlightMenuRef}>
+              <button
+                type="button"
+                className="inline-flex min-h-8 cursor-pointer items-center bg-[#c9efd4] px-2 text-xs font-bold text-black"
                 aria-haspopup="listbox"
                 aria-expanded={highlightMenuOpen}
                 title="Choose which row gets the green highlight"
@@ -718,10 +694,33 @@ export function RacesInProgressPage() {
               ) : null}
             </div>
           </div>
+        ) : null}
+      </header>
+
+      {timingQuery.isLoading ? <Skeleton /> : null}
+      {timingQuery.error ? (
+        <div className="panel" role="alert">
+          <p>{timingQuery.error instanceof Error ? timingQuery.error.message : 'Could not load timing.'}</p>
+          <button
+            type="button"
+            className="btn mt-4"
+            title="Retry loading timing"
+            onClick={() => void timingQuery.refetch()}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+      {!timingQuery.isLoading && !timingQuery.error && classNames.length === 0 ? (
+        <p className="panel">No timing rows for this race yet.</p>
+      ) : null}
+
+      {!timingQuery.isLoading && !timingQuery.error && (showingAll || activeClass) ? (
+        <section aria-label={sectionLabel ?? undefined}>
           {visibleRows.length === 0 ? (
-            <p className="panel mt-2">{showingAll ? 'No timing rows yet.' : 'No timing rows for this class yet.'}</p>
+            <p className="panel">{showingAll ? 'No timing rows yet.' : 'No timing rows for this class yet.'}</p>
           ) : (
-            <div className="table-wrap table-wrap-live mt-2">
+            <div className="table-wrap table-wrap-live">
               <table className="data">
                 <thead>
                   <tr>
