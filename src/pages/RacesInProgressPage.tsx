@@ -245,11 +245,24 @@ let rememberedAllClasses = false
 let rememberedSelectedKey: string | null = null
 /** Last race status seen on this page; used to open Video only on status change. */
 let rememberedRaceStatus: RaceStatus | null = null
+/**
+ * Auto-open chart once after 3 laps, once per live race/practice or simulation run.
+ * Key is `live:<raceId>` or `sim:<generation>`.
+ */
+let rememberedAutoChartKey: string | null = null
+let autoChartSimGen = 0
+let lastSeenSimulatingForAutoChart = false
+
+const AUTO_CHART_AFTER_LAPS = 3
 
 export function RacesInProgressPage() {
   const { context, selectedParticipant } = useEventCode()
   const simulation = useSimulationOptional()
   const simulating = Boolean(simulation?.isActive)
+  if (simulating && !lastSeenSimulatingForAutoChart) {
+    autoChartSimGen += 1
+  }
+  lastSeenSimulatingForAutoChart = simulating
   const raceQuery = useRaceInProgress(context?.eventId ?? null)
   const live = raceQuery.data?.status != null && LIVE.includes(raceQuery.data.status)
   const timingQuery = useLiveTiming(raceQuery.data)
@@ -509,6 +522,17 @@ export function RacesInProgressPage() {
   const chartPoints = chartRow
     ? lapPointsForParticipant(allTimingRows, chartRow.class_id, chartRow.participant_id)
     : []
+  // Once per live race/practice or simulation: open chart after 3 laps are shown.
+  const autoChartKey = simulating ? `sim:${autoChartSimGen}` : `live:${race.race_id}`
+  if (chartPoints.length >= AUTO_CHART_AFTER_LAPS && rememberedAutoChartKey !== autoChartKey) {
+    rememberedAutoChartKey = autoChartKey
+    if (!chartOpen) {
+      rememberedChartOpen = true
+      rememberedVideoOpen = false
+      setChartOpen(true)
+      setVideoOpen(false)
+    }
+  }
   const hasStatusVideo = raceStatusVideoSrc(race.status) != null
   /** Selecting one panel deselects the other; unselecting leaves the other alone. */
   const toggleChart = () => {
