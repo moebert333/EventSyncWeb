@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, Navigate } from 'react-router-dom'
 import { ChartIcon, ProgressTrackingChart } from '../components/ProgressChart'
 import { EventParticipantHeader } from '../components/EventParticipantHeader'
@@ -15,12 +16,17 @@ import {
   formatEventDate,
   formatRaceTime,
   formatRaceTitle,
+  formatSessionName,
   placeRank,
   raceTimeSeconds,
   riderName,
 } from '../lib/format'
 import { lapPointsForParticipant, latestTimingRows } from '../lib/progressTracking'
 import type { ActiveRaceTiming, RaceStatus } from '../types/database'
+
+/** Typical mobile long-press (Material / iOS context-menu range). */
+const HIDE_MEDIA_LONG_PRESS_MS = 500
+const HIDE_MEDIA_MOVE_CANCEL_PX = 12
 
 type HighlightMode = 'firstPlace' | 'bestLap' | 'participant'
 
@@ -291,8 +297,60 @@ export function RacesInProgressPage() {
   const [videoOpen, setVideoOpen] = useState(() => rememberedVideoOpen)
   const [highlightMode, setHighlightMode] = useState<HighlightMode>('bestLap')
   const [highlightMenuOpen, setHighlightMenuOpen] = useState(false)
+  const [hideConfirm, setHideConfirm] = useState<'chart' | 'video' | null>(null)
   const highlightMenuRef = useRef<HTMLDivElement>(null)
   const appliedParticipantRaceRef = useRef<number | null>(null)
+  const hideLongPressTimer = useRef<number | null>(null)
+  const hideLongPressOrigin = useRef<{ x: number; y: number } | null>(null)
+
+  function clearHideLongPress() {
+    if (hideLongPressTimer.current != null) {
+      window.clearTimeout(hideLongPressTimer.current)
+      hideLongPressTimer.current = null
+    }
+    hideLongPressOrigin.current = null
+  }
+
+  function hideMediaLongPressHandlers(kind: 'chart' | 'video') {
+    return {
+      onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
+        if (event.button !== 0) return
+        clearHideLongPress()
+        hideLongPressOrigin.current = { x: event.clientX, y: event.clientY }
+        hideLongPressTimer.current = window.setTimeout(() => {
+          hideLongPressTimer.current = null
+          hideLongPressOrigin.current = null
+          setHideConfirm(kind)
+        }, HIDE_MEDIA_LONG_PRESS_MS)
+      },
+      onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => {
+        const origin = hideLongPressOrigin.current
+        if (origin == null) return
+        if (
+          Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > HIDE_MEDIA_MOVE_CANCEL_PX
+        ) {
+          clearHideLongPress()
+        }
+      },
+      onPointerUp: clearHideLongPress,
+      onPointerLeave: clearHideLongPress,
+      onPointerCancel: clearHideLongPress,
+      onContextMenu: (event: { preventDefault: () => void }) => {
+        event.preventDefault()
+      },
+    }
+  }
+
+  function confirmHideMedia() {
+    if (hideConfirm === 'chart') {
+      rememberedChartOpen = false
+      setChartOpen(false)
+    } else if (hideConfirm === 'video') {
+      rememberedVideoOpen = false
+      setVideoOpen(false)
+    }
+    setHideConfirm(null)
+  }
 
   // Local copies so same-render chart/selection logic sees restored values (setState is async).
   let liveSelectedKey = selectedKey
@@ -469,6 +527,7 @@ export function RacesInProgressPage() {
   }
 
   const when = [formatEventDate(race.race_date), formatClock(race.race_start)].filter(Boolean).join(' · ')
+  const sessionLabel = formatSessionName(race.session_name, true)
   const showingAll = liveAllClasses && classNames.length > 0
   const activeClass = showingAll
     ? null
@@ -576,9 +635,6 @@ export function RacesInProgressPage() {
             {formatRaceTitle(race.race_num, race.is_practice, race.race_name)}
           </h1>
           <StatusPill status={race.status} />
-          {race.status === 'Active' || race.status === 'Paused' || race.status === 'Finished' ? (
-            <p className="text-lg font-semibold tabular-nums">Elapsed Time: {elapsedDisplay}</p>
-          ) : null}
           <div className="ml-auto flex items-center gap-3 pr-2">
             <button
               type="button"
@@ -612,13 +668,19 @@ export function RacesInProgressPage() {
         </div>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-zinc-300">
-            {race.session_name}
-            {when ? ` · ${when}` : ''}
+            {sessionLabel}
+            {sessionLabel && when ? ` · ${when}` : when}
+            {race.status === 'Active' || race.status === 'Paused' || race.status === 'Finished' ? (
+              <>
+                {sessionLabel || when ? ' · ' : ''}
+                <span className="font-semibold tabular-nums text-zinc-100">Elapsed Time: {elapsedDisplay}</span>
+              </>
+            ) : null}
           </p>
           {videoOpen ? (
             <button
               type="button"
-              className="ml-auto mr-[20%] cursor-pointer bg-transparent p-0 text-sm font-normal text-[#f0d56a] underline underline-offset-2"
+              className="ml-auto mr-[20%] hidden cursor-pointer bg-transparent p-0 text-sm font-normal text-[#f0d56a] underline underline-offset-2 md:inline"
               title="Hide status video"
               onClick={() => {
                 rememberedVideoOpen = false
@@ -630,7 +692,7 @@ export function RacesInProgressPage() {
           ) : chartOpen ? (
             <button
               type="button"
-              className="ml-auto mr-[20%] cursor-pointer bg-transparent p-0 text-sm font-normal text-[#f0d56a] underline underline-offset-2"
+              className="ml-auto mr-[20%] hidden cursor-pointer bg-transparent p-0 text-sm font-normal text-[#f0d56a] underline underline-offset-2 md:inline"
               title="Hide progress chart"
               onClick={() => {
                 rememberedChartOpen = false
@@ -641,15 +703,35 @@ export function RacesInProgressPage() {
             </button>
           ) : null}
         </div>
-        <RaceStatusVideo status={race.status} showVideo={videoOpen} />
+        {videoOpen ? (
+          <div
+            className="select-none touch-manipulation"
+            title="Long-press to hide video"
+            {...hideMediaLongPressHandlers('video')}
+          >
+            <RaceStatusVideo status={race.status} showVideo={videoOpen} />
+          </div>
+        ) : null}
         {chartOpen ? (
-          <div id="progress-chart" className="mt-4 max-md:-mx-4">
+          <div
+            id="progress-chart"
+            className="mt-4 max-md:-mx-4 select-none touch-manipulation"
+            title="Long-press to hide chart"
+            {...hideMediaLongPressHandlers('chart')}
+          >
             <ProgressTrackingChart
               riderLabel={chartRow ? `${riderName(chartRow.first_name, chartRow.last_name)} · ${chartRow.class_name}` : ''}
               points={chartPoints}
               throughLap={chartRow?.current_lap_num}
             />
           </div>
+        ) : null}
+        {hideConfirm ? (
+          <HideMediaConfirmDialog
+            kind={hideConfirm}
+            onOk={confirmHideMedia}
+            onCancel={() => setHideConfirm(null)}
+          />
         ) : null}
         {classNames.length > 0 ? (
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -827,4 +909,49 @@ export function RacesInProgressPage() {
       ) : null}
     </div>
   )
+}
+
+function HideMediaConfirmDialog({
+  kind,
+  onOk,
+  onCancel,
+}: {
+  kind: 'chart' | 'video'
+  onOk: () => void
+  onCancel: () => void
+}) {
+  const label = kind === 'chart' ? 'Hide Chart' : 'Hide Video'
+  const panel = (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-20"
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel()
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          onCancel()
+        }
+      }}
+    >
+      <div className="grid w-full max-w-lg gap-3 border border-[#f5c518] bg-[#1a1a1a] p-4 shadow-lg">
+        <p className="text-sm font-semibold uppercase tracking-wide text-zinc-400">{label}</p>
+        <p className="text-sm text-zinc-300">
+          {kind === 'chart' ? 'Hide the progress chart?' : 'Hide the status video?'}
+        </p>
+        <div className="mt-1 flex flex-wrap gap-2">
+          <button type="button" className="btn" title={label} onClick={onOk}>
+            Ok
+          </button>
+          <button type="button" className="btn btn-ghost" title="Keep showing" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+  return createPortal(panel, document.body)
 }
