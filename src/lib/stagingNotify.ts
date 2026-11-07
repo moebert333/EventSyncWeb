@@ -15,11 +15,13 @@ export async function notifyStaging(
   }
   if (permission !== 'granted') return
 
-  const notification = new Notification(message, {
+  // `renotify` is supported by browsers but missing from TS DOM NotificationOptions.
+  const options: NotificationOptions & { renotify?: boolean } = {
     body: message,
     tag: `eventsync-staging-${urgent}`,
     renotify: true,
-  })
+  }
+  const notification = new Notification(message, options)
   notification.onclick = () => {
     window.focus()
     notification.close()
