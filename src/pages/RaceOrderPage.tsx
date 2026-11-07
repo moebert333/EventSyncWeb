@@ -351,6 +351,9 @@ export function RaceOrderPage() {
       : null
 
   // One toast per visit (location.key) + participant, once race data is ready.
+  // Skip when arriving from the title-strip status link (same message already shown there).
+  const skipProgressPopup =
+    (location.state as { skipProgressPopup?: boolean } | null)?.skipProgressPopup === true
   const progressTriggerKey = participantId != null ? `${location.key}:${participantId}` : null
 
   useEffect(() => {
@@ -360,8 +363,12 @@ export function RaceOrderPage() {
     }
     if (progressShownFor === progressTriggerKey) return
     setProgressShownFor(progressTriggerKey)
+    if (skipProgressPopup) {
+      setProgressOpen(false)
+      return
+    }
     setProgressOpen(true)
-  }, [progressTriggerKey, progressName, progressRaceText, progressShownFor])
+  }, [progressTriggerKey, progressName, progressRaceText, progressShownFor, skipProgressPopup])
 
   useEffect(() => {
     if (!progressOpen) return

@@ -83,10 +83,21 @@ export function EventParticipantHeader({
     >
       <div className="space-y-1">
         <div className="flex min-h-[1.75rem] items-center gap-x-3">
-          <p className="shrink-0 text-xl font-bold leading-tight text-green-500">{titleLabel}</p>
+          {progressParts?.title ? (
+            <Link
+              to="/live"
+              className="shrink-0 text-xl font-bold leading-tight !text-green-500 no-underline"
+              title="Go to Active Race"
+            >
+              {titleLabel}
+            </Link>
+          ) : (
+            <p className="shrink-0 text-xl font-bold leading-tight text-green-500">{titleLabel}</p>
+          )}
           {statusDetail ? (
             <Link
               to="/order"
+              state={{ skipProgressPopup: true }}
               className="min-w-0 flex-1 text-right text-lg font-semibold leading-tight !text-[#f0d56a] underline underline-offset-2 sm:text-center"
               title="Go to Race Order"
             >
