@@ -87,7 +87,7 @@ export function EventParticipantHeader({
           {statusDetail ? (
             <Link
               to="/order"
-              className="min-w-0 flex-1 text-right text-lg font-semibold leading-tight text-[#f0d56a] underline underline-offset-2 sm:text-center"
+              className="min-w-0 flex-1 text-right text-lg font-semibold leading-tight !text-[#f0d56a] underline underline-offset-2 sm:text-center"
               title="Go to Race Order"
             >
               {statusDetail}
