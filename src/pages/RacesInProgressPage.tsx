@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { createPortal } from 'react-dom'
 import { Link, Navigate } from 'react-router-dom'
 import { ChartIcon, ProgressTrackingChart } from '../components/ProgressChart'
 import { EventParticipantHeader } from '../components/EventParticipantHeader'
@@ -12,8 +11,6 @@ import { useElapsedRaceClock } from '../hooks/useElapsedRaceClock'
 import { useSimulationOptional } from '../lib/simulationContext'
 import {
   bestLapLabel,
-  formatClock,
-  formatEventDate,
   formatRaceTime,
   formatRaceTitle,
   formatSessionName,
@@ -297,7 +294,6 @@ export function RacesInProgressPage() {
   const [videoOpen, setVideoOpen] = useState(() => rememberedVideoOpen)
   const [highlightMode, setHighlightMode] = useState<HighlightMode>('bestLap')
   const [highlightMenuOpen, setHighlightMenuOpen] = useState(false)
-  const [hideConfirm, setHideConfirm] = useState<'chart' | 'video' | null>(null)
   const highlightMenuRef = useRef<HTMLDivElement>(null)
   const appliedParticipantRaceRef = useRef<number | null>(null)
   const hideLongPressTimer = useRef<number | null>(null)
@@ -311,6 +307,16 @@ export function RacesInProgressPage() {
     hideLongPressOrigin.current = null
   }
 
+  function hideMedia(kind: 'chart' | 'video') {
+    if (kind === 'chart') {
+      rememberedChartOpen = false
+      setChartOpen(false)
+      return
+    }
+    rememberedVideoOpen = false
+    setVideoOpen(false)
+  }
+
   function hideMediaLongPressHandlers(kind: 'chart' | 'video') {
     return {
       onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -320,7 +326,7 @@ export function RacesInProgressPage() {
         hideLongPressTimer.current = window.setTimeout(() => {
           hideLongPressTimer.current = null
           hideLongPressOrigin.current = null
-          setHideConfirm(kind)
+          hideMedia(kind)
         }, HIDE_MEDIA_LONG_PRESS_MS)
       },
       onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -339,17 +345,6 @@ export function RacesInProgressPage() {
         event.preventDefault()
       },
     }
-  }
-
-  function confirmHideMedia() {
-    if (hideConfirm === 'chart') {
-      rememberedChartOpen = false
-      setChartOpen(false)
-    } else if (hideConfirm === 'video') {
-      rememberedVideoOpen = false
-      setVideoOpen(false)
-    }
-    setHideConfirm(null)
   }
 
   // Local copies so same-render chart/selection logic sees restored values (setState is async).
@@ -526,7 +521,6 @@ export function RacesInProgressPage() {
     )
   }
 
-  const when = [formatEventDate(race.race_date), formatClock(race.race_start)].filter(Boolean).join(' · ')
   const sessionLabel = formatSessionName(race.session_name, true)
   const showingAll = liveAllClasses && classNames.length > 0
   const activeClass = showingAll
@@ -669,10 +663,9 @@ export function RacesInProgressPage() {
         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-zinc-300">
             {sessionLabel}
-            {sessionLabel && when ? ` · ${when}` : when}
             {race.status === 'Active' || race.status === 'Paused' || race.status === 'Finished' ? (
               <>
-                {sessionLabel || when ? ' · ' : ''}
+                {sessionLabel ? ' · ' : ''}
                 <span className="font-semibold tabular-nums text-zinc-100">Elapsed Time: {elapsedDisplay}</span>
               </>
             ) : null}
@@ -725,13 +718,6 @@ export function RacesInProgressPage() {
               throughLap={chartRow?.current_lap_num}
             />
           </div>
-        ) : null}
-        {hideConfirm ? (
-          <HideMediaConfirmDialog
-            kind={hideConfirm}
-            onOk={confirmHideMedia}
-            onCancel={() => setHideConfirm(null)}
-          />
         ) : null}
         {classNames.length > 0 ? (
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -909,49 +895,4 @@ export function RacesInProgressPage() {
       ) : null}
     </div>
   )
-}
-
-function HideMediaConfirmDialog({
-  kind,
-  onOk,
-  onCancel,
-}: {
-  kind: 'chart' | 'video'
-  onOk: () => void
-  onCancel: () => void
-}) {
-  const label = kind === 'chart' ? 'Hide Chart' : 'Hide Video'
-  const panel = (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-20"
-      role="dialog"
-      aria-modal="true"
-      aria-label={label}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onCancel()
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.preventDefault()
-          onCancel()
-        }
-      }}
-    >
-      <div className="grid w-full max-w-lg gap-3 border border-[#f5c518] bg-[#1a1a1a] p-4 shadow-lg">
-        <p className="text-sm font-semibold uppercase tracking-wide text-zinc-400">{label}</p>
-        <p className="text-sm text-zinc-300">
-          {kind === 'chart' ? 'Hide the progress chart?' : 'Hide the status video?'}
-        </p>
-        <div className="mt-1 flex flex-wrap gap-2">
-          <button type="button" className="btn" title={label} onClick={onOk}>
-            Ok
-          </button>
-          <button type="button" className="btn btn-ghost" title="Keep showing" onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-  return createPortal(panel, document.body)
 }
