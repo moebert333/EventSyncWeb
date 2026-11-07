@@ -81,11 +81,11 @@ export function EventParticipantHeader({
       className={`sticky ${STICKY_TOP} z-20 -mx-4 -mt-6 border-b border-[#f5c518]/35 bg-[#252525] px-4 py-2 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]`}
     >
       <div className="space-y-1">
-        <div className="relative flex min-h-[1.75rem] items-center">
-          <p className="relative z-10 text-xl font-bold leading-tight text-green-500">{titleLabel}</p>
+        <div className="flex min-h-[1.75rem] items-center gap-x-3">
+          <p className="shrink-0 text-xl font-bold leading-tight text-green-500">{titleLabel}</p>
           {statusDetail ? (
-            <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-lg font-semibold leading-tight text-zinc-300">
-              <span className="max-w-[min(100%,36rem)]">{statusDetail}</span>
+            <p className="min-w-0 flex-1 text-right text-lg font-semibold leading-tight text-zinc-300 sm:text-center">
+              {statusDetail}
             </p>
           ) : null}
         </div>
