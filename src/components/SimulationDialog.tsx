@@ -6,7 +6,7 @@ import { useEventRaceOrder } from '../hooks/useEventRaceOrder'
 import { formatRaceTitle } from '../lib/format'
 import { useSimulation } from '../lib/simulationContext'
 
-const DEFAULT_LAP_SEC = 15
+const DEFAULT_LAP_SEC = 5
 const MIN_LAP_SEC = 2
 const MAX_LAP_SEC = 120
 const LIVE_PATH = '/live'

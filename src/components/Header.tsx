@@ -99,13 +99,28 @@ export function Header() {
 
         <button
           type="button"
-          className="ml-auto inline-flex min-h-11 min-w-11 items-center justify-center border border-white/15 md:hidden"
+          className="ml-auto inline-flex min-h-11 min-w-11 items-center justify-center border border-white/15 text-zinc-200 md:hidden"
           aria-expanded={open}
           aria-controls="site-nav"
+          aria-label={open ? 'Close menu' : 'Open menu'}
           title={open ? 'Close menu' : 'Open menu'}
           onClick={() => setMenuPath(open ? null : location.pathname)}
         >
-          {open ? 'Close' : 'Menu'}
+          {open ? (
+            <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M6.4 5.3 5.3 6.4 10.9 12l-5.6 5.6 1.1 1.1L12 13.1l5.6 5.6 1.1-1.1L13.1 12l5.6-5.6-1.1-1.1L12 10.9 6.4 5.3Z"
+              />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M4 6.5h16v1.75H4V6.5Zm0 4.625h16v1.75H4v-1.75Zm0 4.625h16V17.5H4v-1.75Z"
+              />
+            </svg>
+          )}
         </button>
       </div>
 

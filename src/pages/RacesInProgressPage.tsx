@@ -629,7 +629,7 @@ export function RacesInProgressPage() {
         ) : null}
         {classNames.length > 0 ? (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Race classes">
+            <div className="contents" role="group" aria-label="Race classes">
               {classNames.map((name) => {
                 const selected = name === activeClass
                 return (
