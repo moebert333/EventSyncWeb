@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { Footer } from './Footer'
 import { Header } from './Header'
+import { InstallAppBanner } from './InstallAppBanner'
 import { OfflineBanner } from './OfflineBanner'
 import { SimulationBanner } from './SimulationBanner'
 import { SimulationProvider } from './SimulationProvider'
@@ -11,6 +12,7 @@ export function AppShell() {
     <SimulationProvider>
       <div className="flex min-h-dvh flex-col">
         <Header />
+        <InstallAppBanner />
         <SimulationBanner />
         <OfflineBanner />
         <StagingAlert />

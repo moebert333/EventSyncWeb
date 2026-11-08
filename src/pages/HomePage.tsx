@@ -7,20 +7,7 @@ import { useRaceInProgress } from '../hooks/useRaceInProgress'
 import { formatEventDate } from '../lib/format'
 import type { RaceStatus } from '../types/database'
 
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-}
-
 const IN_PROGRESS: RaceStatus[] = ['Staging', 'Active', 'Paused']
-
-function isIosDevice(): boolean {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent)
-}
-
-function isStandalone(): boolean {
-  const nav = navigator as Navigator & { standalone?: boolean }
-  return window.matchMedia('(display-mode: standalone)').matches || Boolean(nav.standalone)
-}
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -31,7 +18,6 @@ export function HomePage() {
   const [promptParticipant, setPromptParticipant] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const tried = useRef<string | null>(null)
-  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null)
   const needCode = params.get('needCode') === '1'
   const codeParam = params.get('code')
 
@@ -50,15 +36,6 @@ export function HomePage() {
   useEffect(() => {
     if (needCode) inputRef.current?.focus()
   }, [needCode])
-
-  useEffect(() => {
-    const onPrompt = (event: Event) => {
-      event.preventDefault()
-      setInstallEvent(event as BeforeInstallPromptEvent)
-    }
-    window.addEventListener('beforeinstallprompt', onPrompt)
-    return () => window.removeEventListener('beforeinstallprompt', onPrompt)
-  }, [])
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -86,7 +63,6 @@ export function HomePage() {
 
   const dateLabel = formatEventDate(context?.eventDate)
   const place = [context?.track, context?.location].filter(Boolean).join(' · ')
-  const showIosHint = isIosDevice() && !isStandalone()
   const actionsBusy = promptParticipant && raceQuery.isLoading
 
   return (
@@ -177,22 +153,6 @@ export function HomePage() {
             </div>
           ) : null}
 
-          {showIosHint ? (
-            <p className="mt-6 text-sm text-zinc-400">Share → Add to Home Screen</p>
-          ) : null}
-          {installEvent && !isStandalone() ? (
-            <button
-              type="button"
-              className="btn btn-ghost mt-4"
-              title="Install EventSync on this device"
-              onClick={() => {
-                void installEvent.prompt()
-                setInstallEvent(null)
-              }}
-            >
-              Install EventSync
-            </button>
-          ) : null}
         </section>
 
         <aside>
