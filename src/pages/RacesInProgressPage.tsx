@@ -31,9 +31,17 @@ const CLASS_LONG_PRESS_MOVE_CANCEL_PX = 12
 
 type HighlightMode = 'firstPlace' | 'bestLap' | 'participant'
 
+/** Closed control label. */
 const HIGHLIGHT_LABELS: Record<HighlightMode, string> = {
   firstPlace: '1st Place',
-  bestLap: 'Lap Time',
+  bestLap: 'Best Lap',
+  participant: 'Rider',
+}
+
+/** Dropdown option label (Best Lap Time only while the menu is open). */
+const HIGHLIGHT_MENU_LABELS: Record<HighlightMode, string> = {
+  firstPlace: '1st Place',
+  bestLap: 'Best Lap Time',
   participant: 'Rider',
 }
 
@@ -498,6 +506,23 @@ export function RacesInProgressPage() {
     if (selectedKey != null) rememberedSelectedKey = selectedKey
   }, [selectionRaceId, videoOpen, chartOpen, selectedClasses, selectedKey])
 
+  // Once per live race/practice or simulation run: open Chart after any rider completes lap 3.
+  const raceMaxLap = timingRows.reduce(
+    (max, row) => Math.max(max, row.current_lap_num ?? 0),
+    0,
+  )
+  useEffect(() => {
+    if (raceId == null) return
+    if (raceMaxLap < AUTO_CHART_AFTER_LAPS) return
+    const autoChartKey = simulating ? `sim:${autoChartSimGen}` : `live:${raceId}`
+    if (rememberedAutoChartKey === autoChartKey) return
+    rememberedAutoChartKey = autoChartKey
+    rememberedChartOpen = true
+    rememberedVideoOpen = false
+    setChartOpen(true)
+    setVideoOpen(false)
+  }, [raceId, simulating, autoChartSimGen, raceMaxLap])
+
   if (!context) return null
 
   if (raceQuery.isLoading) {
@@ -683,17 +708,6 @@ export function RacesInProgressPage() {
   const chartPoints = chartRow
     ? lapPointsForParticipant(allTimingRows, chartRow.class_id, chartRow.participant_id)
     : []
-  // Once per live race/practice or simulation: open chart after 3 laps are shown.
-  const autoChartKey = simulating ? `sim:${autoChartSimGen}` : `live:${race.race_id}`
-  if (chartPoints.length >= AUTO_CHART_AFTER_LAPS && rememberedAutoChartKey !== autoChartKey) {
-    rememberedAutoChartKey = autoChartKey
-    if (!chartOpen) {
-      rememberedChartOpen = true
-      rememberedVideoOpen = false
-      setChartOpen(true)
-      setVideoOpen(false)
-    }
-  }
   const hasStatusVideo = raceStatusVideoSrc(race.status) != null
   /** Selecting one panel deselects the other; unselecting leaves the other alone. */
   const toggleChart = () => {
@@ -868,22 +882,22 @@ export function RacesInProgressPage() {
                 <ul
                   role="listbox"
                   aria-label="Green row highlight"
-                  className="absolute right-0 z-20 mt-1 min-w-full border border-white/20 bg-[#1a1a1a] py-1 shadow-lg"
+                  className="absolute right-0 z-20 mt-1 min-w-[11rem] border border-white/20 bg-[#1a1a1a] py-1 shadow-lg"
                 >
                   {(Object.keys(HIGHLIGHT_LABELS) as HighlightMode[]).map((mode) => (
                     <li key={mode} role="option" aria-selected={highlightMode === mode}>
                       <button
                         type="button"
-                        className={`block w-full cursor-pointer px-3 py-2 text-left text-sm font-bold ${
+                        className={`block w-full cursor-pointer whitespace-nowrap px-3 py-2 text-left text-sm font-bold ${
                           highlightMode === mode ? 'bg-[#c9efd4] text-black' : 'text-white hover:bg-white/10'
                         }`}
-                        title={`Highlight ${HIGHLIGHT_LABELS[mode]}`}
+                        title={`Highlight ${HIGHLIGHT_MENU_LABELS[mode]}`}
                         onClick={() => {
                           setHighlightMode(mode)
                           setHighlightMenuOpen(false)
                         }}
                       >
-                        {HIGHLIGHT_LABELS[mode]}
+                        {HIGHLIGHT_MENU_LABELS[mode]}
                       </button>
                     </li>
                   ))}
