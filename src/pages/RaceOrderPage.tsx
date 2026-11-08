@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { EventParticipantHeader } from '../components/EventParticipantHeader'
 import { Skeleton } from '../components/Skeleton'
 import { statusToneClass } from '../components/StatusPill'
@@ -405,7 +405,7 @@ export function RaceOrderPage() {
     practiceRaces.length,
   ])
 
-  if (!context) return <Navigate to="/?needCode=1" replace />
+  if (!context) return null
 
   const participantRaceIds = new Set(participantRacesQuery.data ?? [])
   const stripSessionPrefix = sessionsShareCommonPrefix(races.map((race) => race.session_name))

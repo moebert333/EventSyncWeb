@@ -73,7 +73,7 @@ export function EventCodeProvider({ children }: { children: ReactNode }) {
   const submitCode = useCallback(async (raw: string) => {
     const code = raw.trim()
     if (!isEventCodeShape(code)) {
-      setError('Event Codes are 6–12 characters.')
+      setError('Event Codes are 4–12 characters.')
       return false
     }
     setResolving(true)

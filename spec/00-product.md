@@ -17,7 +17,7 @@ EventSync is a public website and installable PWA for racers and spectators at a
 
 ## User jobs (MVP)
 
-1. Scan a QR or type a 6–12 character Event Code and land on that organization + event.
+1. Scan a QR or type a 4–12 character Event Code and land on that organization + event.
 2. Optionally pick a Selected participant on Home (search name/plate) to carry into live timing and completed results.
 3. See that a race is staging / in progress / paused, choose one class, and follow live participant timing plus a place and lap-time progress chart.
 4. Browse completed event results, filter by series → event → class or participant.

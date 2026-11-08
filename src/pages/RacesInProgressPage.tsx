@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ChartIcon, ProgressTrackingChart } from '../components/ProgressChart'
 import { EventParticipantHeader } from '../components/EventParticipantHeader'
 import { RaceStatusVideo, VideoIcon, raceStatusVideoSrc } from '../components/RaceStatusVideo'
@@ -483,7 +483,7 @@ export function RacesInProgressPage() {
     if (selectedKey != null) rememberedSelectedKey = selectedKey
   }, [selectionRaceId, videoOpen, chartOpen, selectedClasses, selectedKey])
 
-  if (!context) return <Navigate to="/?needCode=1" replace />
+  if (!context) return null
 
   if (raceQuery.isLoading) {
     return (

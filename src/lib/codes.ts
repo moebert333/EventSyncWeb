@@ -3,7 +3,7 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 export function isEventCodeShape(value: string): boolean {
   const code = value.trim()
   // Length only — matches DB event_codes_code_len. Underscores are valid; LIKE wildcards are escaped at lookup.
-  return code.length >= 6 && code.length <= 12
+  return code.length >= 4 && code.length <= 12
 }
 
 /** Escape \, %, _ so user codes are exact ILIKE matches, not LIKE wildcards. */
@@ -30,7 +30,7 @@ export function friendlyCodeError(code: string, message: string): string {
     return 'That Event Code is already in use.'
   }
   if (message.toLowerCase().includes('event_codes_code_len')) {
-    return 'Event Codes are 6–12 characters.'
+    return 'Event Codes are 4–12 characters.'
   }
   return message
 }

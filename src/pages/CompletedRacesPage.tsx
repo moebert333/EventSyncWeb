@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import { EventParticipantHeader } from '../components/EventParticipantHeader'
 import { Skeleton } from '../components/Skeleton'
 import { useEventCode } from '../hooks/useEventCode'
@@ -153,7 +152,7 @@ export function CompletedRacesPage() {
     }
   }, [racesQuery.isSuccess, racesQuery.data, raceId, request?.raceId])
 
-  if (!context) return <Navigate to="/?needCode=1" replace />
+  if (!context) return null
 
   // Drop a stored selection whose event is no longer available in this org.
   if (

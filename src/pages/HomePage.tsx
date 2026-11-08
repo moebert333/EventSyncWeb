@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { SelectParticipantBox } from '../components/SelectParticipantBox'
 import { newsArticles } from '../data/news'
 import { useEventCode } from '../hooks/useEventCode'
+import { useEventCodeQueryParam } from '../hooks/useEventCodeQueryParam'
 import { useRaceInProgress } from '../hooks/useRaceInProgress'
 import { formatEventDate } from '../lib/format'
 import type { RaceStatus } from '../types/database'
@@ -12,22 +13,22 @@ const IN_PROGRESS: RaceStatus[] = ['Staging', 'Active', 'Paused']
 export function HomePage() {
   const navigate = useNavigate()
   const { context, error, resolving, submitCode } = useEventCode()
+  const { code: codeParam, matched: codeMatched } = useEventCodeQueryParam()
   const raceQuery = useRaceInProgress(context?.eventId ?? null)
   const [params] = useSearchParams()
   const [draft, setDraft] = useState('')
   const [promptParticipant, setPromptParticipant] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const tried = useRef<string | null>(null)
+  const promptedForCode = useRef<string | null>(null)
   const needCode = params.get('needCode') === '1'
-  const codeParam = params.get('code')
 
+  // `/?code=XXXX` — same as typing the code: resolve then offer Select Rider.
   useEffect(() => {
-    if (!codeParam || tried.current === codeParam) return
-    tried.current = codeParam
-    void submitCode(codeParam).then((ok) => {
-      if (ok) setPromptParticipant(true)
-    })
-  }, [codeParam, submitCode])
+    if (!codeParam || !codeMatched) return
+    if (promptedForCode.current === codeParam) return
+    promptedForCode.current = codeParam
+    setPromptParticipant(true)
+  }, [codeParam, codeMatched])
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -150,6 +151,17 @@ export function HomePage() {
                   actionsBusy={actionsBusy}
                 />
               ) : null}
+
+              <p className="text-sm text-zinc-400">
+                Share this event:{' '}
+                <a
+                  className="break-all text-[#f5c518] underline underline-offset-2"
+                  href={`${window.location.origin}/?code=${encodeURIComponent(context.code)}`}
+                  title="Open this event with the Event Code in the URL"
+                >
+                  {`${window.location.origin}/?code=${encodeURIComponent(context.code)}`}
+                </a>
+              </p>
             </div>
           ) : null}
 

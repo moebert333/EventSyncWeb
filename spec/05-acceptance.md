@@ -23,7 +23,7 @@ PWA after Home + Admin work, not before Event Code resolution.
 
 ## B. Event Code (public)
 
-- [ ] Home accepts 6–12 character code
+- [ ] Home accepts 4–12 character code
 - [ ] `/?code=VALUE` resolves the same way
 - [ ] Valid code stores org + series + event and shows names in the header
 - [ ] Unknown code shows an error and does not send the user to `/live`
@@ -58,7 +58,7 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] Create/edit organization name + description
 - [ ] Create/edit series under that org
 - [ ] Create/edit events (`name`, `description`, `date`, `track`, `location`)
-- [ ] Each event has a 6–12 character Event Code; new events get a random default
+- [ ] Each event has a 4–12 character Event Code; new events get a random default
 - [ ] Admin can change the code; unique constraint errors are visible
 - [ ] QR for `https://<origin>/?code=<CODE>` is visible for the selected event
 - [ ] Admin cannot edit races, timing, or results from this site

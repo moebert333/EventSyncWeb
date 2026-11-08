@@ -163,7 +163,7 @@ export function OrganizationAdminPage() {
     mutationFn: async () => {
       if (!selectedEvent) throw new Error('Choose an event.')
       const next = codeDraft.trim().toUpperCase()
-      if (next.length < 6 || next.length > 12) throw new Error('Event Codes are 6–12 characters.')
+      if (next.length < 4 || next.length > 12) throw new Error('Event Codes are 4–12 characters.')
       const existing = codeQuery.data
       const write = existing
         ? supabase.from('event_codes').update({ code: next }).eq('event_id', selectedEvent.event_id)

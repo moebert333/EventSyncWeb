@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
+import { RequireEventContext } from './components/RequireEventContext'
 import { hasSupabaseEnv } from './lib/supabase'
 import { AdminCallbackPage } from './pages/admin/AdminCallbackPage'
 import { AdminPage } from './pages/admin/AdminPage'
@@ -24,10 +25,38 @@ export const router = createBrowserRouter(
           element: <AppShell />,
           children: [
             { path: '/', element: <HomePage /> },
-            { path: '/order', element: <RaceOrderPage /> },
-            { path: '/live', element: <RacesInProgressPage /> },
-            { path: '/results', element: <CompletedRacesPage /> },
-            { path: '/stream', element: <LiveStreamPage /> },
+            {
+              path: '/order',
+              element: (
+                <RequireEventContext>
+                  <RaceOrderPage />
+                </RequireEventContext>
+              ),
+            },
+            {
+              path: '/live',
+              element: (
+                <RequireEventContext>
+                  <RacesInProgressPage />
+                </RequireEventContext>
+              ),
+            },
+            {
+              path: '/results',
+              element: (
+                <RequireEventContext>
+                  <CompletedRacesPage />
+                </RequireEventContext>
+              ),
+            },
+            {
+              path: '/stream',
+              element: (
+                <RequireEventContext>
+                  <LiveStreamPage />
+                </RequireEventContext>
+              ),
+            },
             { path: '*', element: <Navigate to="/" replace /> },
           ],
         },

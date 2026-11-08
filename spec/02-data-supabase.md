@@ -80,7 +80,7 @@ alter table public.event_codes
 
 alter table public.event_codes
   add constraint event_codes_code_len
-  check (char_length(code) between 6 and 12);
+  check (char_length(code) between 4 and 12);
 ```
 
 Codes are matched **case-insensitively** in the app (`lower(code)`). Prefer storing uppercase.

@@ -371,10 +371,10 @@ export function stagingLabelText(
   if (stagingIn === 'inThisRace') return `You are in this ${Unit}`
   if (stagingIn === 0) {
     // Participant is in the Staging active session.
-    if (raceStatus === 'Staging' || raceStatus == null) return `Your ${Unit} is Staging`
-    return `Your ${sessionWord(isPractice, false)} is ${raceStatus}`
+    if (raceStatus === 'Staging' || raceStatus == null) return `Your next ${Unit} is Staging`
+    return `Your next ${sessionWord(isPractice, false)} is ${raceStatus}`
   }
-  if (stagingIn === 1 || stagingIn === 2) return `Your ${Unit} is Staging`
+  if (stagingIn === 1 || stagingIn === 2) return `Your next ${Unit} is Staging`
   if (stagingIn != null) return `Staging in: ${stagingIn - 2} ${Units}`
   return null
 }

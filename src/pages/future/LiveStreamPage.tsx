@@ -1,10 +1,9 @@
-import { Navigate } from 'react-router-dom'
 import { EventParticipantHeader } from '../../components/EventParticipantHeader'
 import { useEventCode } from '../../hooks/useEventCode'
 
 export function LiveStreamPage() {
   const { context } = useEventCode()
-  if (!context) return <Navigate to="/?needCode=1" replace />
+  if (!context) return null
 
   return (
     <div className="space-y-5">
