@@ -375,10 +375,12 @@ export function RacesInProgressPage() {
       rememberedPanelEventId !== eventId || rememberedPanelRaceId !== raceId
     setSelectionRaceId(raceId)
     // Entering /live or a new active race: always select the first class only.
-    liveSelectedClasses = []
-    rememberedSelectedClasses = null
+    // `null` means “pending first class” until class names are available.
+    const initialClasses = classNames[0] != null ? [classNames[0]] : []
+    liveSelectedClasses = initialClasses
+    rememberedSelectedClasses = classNames[0] != null ? initialClasses : null
     liveSelectedKey = rememberedSelectedKey
-    setSelectedClasses([])
+    setSelectedClasses(initialClasses)
     setSort(PLACE_SORT)
     setSelectedKey(liveSelectedKey)
     // Always restore last chart/video view on remount; status changes switch to Video separately.
@@ -473,7 +475,10 @@ export function RacesInProgressPage() {
     rememberedPanelRaceId = selectionRaceId
     rememberedVideoOpen = videoOpen
     rememberedChartOpen = chartOpen
-    rememberedSelectedClasses = selectedClasses
+    // Only persist non-empty picks here. Empty/`null` are set by race-change / toggle.
+    if (selectedClasses.length > 0) {
+      rememberedSelectedClasses = selectedClasses
+    }
     // Do not clobber a stored rider with a transient null before timing/restore settles.
     if (selectedKey != null) rememberedSelectedKey = selectedKey
   }, [selectionRaceId, videoOpen, chartOpen, selectedClasses, selectedKey])
