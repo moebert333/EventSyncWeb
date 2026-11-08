@@ -50,14 +50,28 @@ function hasColumnValue(value: string | number | null | undefined): boolean {
   return value != null && value !== ''
 }
 
-/** True when the class needs client Place/Points enrichment. */
+function pointsAllEmpty(rows: EventClassResult[]): boolean {
+  return rows.every((row) => row.overall_points == null || row.overall_points === 0)
+}
+
+function classHasNumericPlace(rows: EventClassResult[]): boolean {
+  return rows.some((row) => {
+    const place = parsePlaceValue(row.overall_place)
+    return place != null && place > 0
+  })
+}
+
+/** True when the class needs full client Place + Points calculation (no server Place). */
 export function classNeedsPointsCalc(rows: EventClassResult[]): boolean {
   if (rows.length === 0) return false
-  for (const row of rows) {
-    const place = parsePlaceValue(row.overall_place)
-    if (place != null && place > 0) return false
-  }
-  return rows.every((row) => row.overall_points == null || row.overall_points === 0)
+  if (classHasNumericPlace(rows)) return false
+  return pointsAllEmpty(rows)
+}
+
+/** True when Place exists but Points are all 0/null — fill Points only. */
+export function classNeedsPointsOnlyFill(rows: EventClassResult[]): boolean {
+  if (rows.length === 0) return false
+  return classHasNumericPlace(rows) && pointsAllEmpty(rows)
 }
 
 function columnHasAnyValue(rows: EventClassResult[], key: ScoringKey): boolean {
@@ -126,8 +140,9 @@ type RankedRider = {
 }
 
 /**
- * When gates pass, fill overall_place; fill overall_points when the moto Points
- * gate passes (VITE_REQUIRE_ALL_MOTOS) or Final path. Incomplete → Points 0.
+ * When gates pass, fill overall_place (if missing) and overall_points when the
+ * moto Points gate passes (VITE_REQUIRE_ALL_MOTOS) or Final path. Incomplete → Points 0.
+ * When server Place exists and Points are empty, keep Place and fill Points only.
  */
 function withZeroPoints(rows: EventClassResult[]): EventClassResult[] {
   if (rows.every((row) => row.overall_points === 0)) return rows
@@ -137,33 +152,63 @@ function withZeroPoints(rows: EventClassResult[]): EventClassResult[] {
   }))
 }
 
+function shouldAssignPointsForClass(
+  rows: EventClassResult[],
+  keys: ScoringKey[],
+  maxMoto: number | null,
+): boolean {
+  const isFinalPath = keys.length === 1 && keys[0] === 'finals_place'
+  // With a scheduled max moto: VITE_REQUIRE_ALL_MOTOS=true → every moto 1…max;
+  // false (default) → Points once any one moto is numerically scored.
+  // Final-only or unknown max moto: assign Points as before.
+  return (
+    isFinalPath ||
+    maxMoto == null ||
+    maxMoto < 1 ||
+    (requireAllMotosFromEnv() ? motosFullyScored(rows, maxMoto) : anyMotoScored(rows, maxMoto))
+  )
+}
+
+function fillPointsFromExistingPlace(
+  rows: EventClassResult[],
+  pointsByPosition: Map<number, number>,
+  shouldAssignPoints: boolean,
+): EventClassResult[] {
+  return rows.map((row) => {
+    const place = parsePlaceValue(row.overall_place)
+    const points =
+      !shouldAssignPoints || place == null ? 0 : (pointsByPosition.get(place) ?? 0)
+    return {
+      ...row,
+      overall_points: points,
+    }
+  })
+}
+
 export function enrichClassResults(
   rows: EventClassResult[],
   pointsByPosition: Map<number, number>,
   maxMoto: number | null = null,
 ): EventClassResult[] {
-  if (!classNeedsPointsCalc(rows)) {
-    // No client calc, but still show Points as 0 when none are scored yet.
-    if (rows.every((row) => row.overall_points == null || row.overall_points === 0)) {
-      return withZeroPoints(rows)
-    }
+  const needsFullCalc = classNeedsPointsCalc(rows)
+  const needsPointsOnly = classNeedsPointsOnlyFill(rows)
+
+  if (!needsFullCalc && !needsPointsOnly) {
+    // Points already scored (or empty class) — leave unchanged aside from null → 0 display.
+    if (pointsAllEmpty(rows)) return withZeroPoints(rows)
     return rows
   }
 
   const keys = activeScoringKeys(rows, maxMoto)
   if (keys.length === 0) return withZeroPoints(rows)
 
-  const lastKey = keys[keys.length - 1]!
-  const isFinalPath = keys.length === 1 && keys[0] === 'finals_place'
-  // With a scheduled max moto: VITE_REQUIRE_ALL_MOTOS=true → every moto 1…max;
-  // false (default) → Points once any one moto is numerically scored.
-  // Final-only or unknown max moto: assign Points as before.
-  const shouldAssignPoints =
-    isFinalPath ||
-    maxMoto == null ||
-    maxMoto < 1 ||
-    (requireAllMotosFromEnv() ? motosFullyScored(rows, maxMoto) : anyMotoScored(rows, maxMoto))
+  const shouldAssignPoints = shouldAssignPointsForClass(rows, keys, maxMoto)
 
+  if (needsPointsOnly) {
+    return fillPointsFromExistingPlace(rows, pointsByPosition, shouldAssignPoints)
+  }
+
+  const lastKey = keys[keys.length - 1]!
   const ranked: RankedRider[] = rows.map((row) => {
     const allNonNumeric = !riderHasAnyNumericScore(row, keys)
     const sum = keys.reduce((total, key) => total + scoreForColumn(row, key), 0)
