@@ -242,7 +242,7 @@ let rememberedPanelRaceId: number | null | undefined = undefined
 /** True until the user hides video or opens the chart — so first /live visit shows video. */
 let rememberedVideoOpen = true
 let rememberedChartOpen = false
-/** Selected class chips to show; `null` means default to the first class once names load. */
+/** In-visit class chip selection; cleared on race change / page entry so first class wins. */
 let rememberedSelectedClasses: string[] | null = null
 /** `classId-participantId` from the last selected table row. */
 let rememberedSelectedKey: string | null = null
@@ -286,9 +286,8 @@ export function RacesInProgressPage() {
   )
   /** Unset until the first successful load; then tracks the shown race id. */
   const [selectionRaceId, setSelectionRaceId] = useState<number | null | undefined>(undefined)
-  const [selectedClasses, setSelectedClasses] = useState<string[]>(
-    () => rememberedSelectedClasses ?? [],
-  )
+  // Always start empty; first class is applied when race/class names are ready.
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([])
   const [sort, setSort] = useState<SortState>(PLACE_SORT)
   const [selectedKey, setSelectedKey] = useState<string | null>(() => rememberedSelectedKey)
   const [chartOpen, setChartOpen] = useState(() => rememberedChartOpen)
@@ -375,10 +374,11 @@ export function RacesInProgressPage() {
     const raceChanged =
       rememberedPanelEventId !== eventId || rememberedPanelRaceId !== raceId
     setSelectionRaceId(raceId)
-    // Keep last class chip selection (or none → UI falls back to first class).
-    liveSelectedClasses = rememberedSelectedClasses ?? []
+    // Entering /live or a new active race: always select the first class only.
+    liveSelectedClasses = []
+    rememberedSelectedClasses = null
     liveSelectedKey = rememberedSelectedKey
-    setSelectedClasses(liveSelectedClasses)
+    setSelectedClasses([])
     setSort(PLACE_SORT)
     setSelectedKey(liveSelectedKey)
     // Always restore last chart/video view on remount; status changes switch to Video separately.
@@ -391,14 +391,15 @@ export function RacesInProgressPage() {
     }
   }
 
-  // Drop chips for classes that left this race; default to first class on first visit.
+  // Drop chips for classes that left this race.
   const prunedSelected = liveSelectedClasses.filter((name) => classNames.includes(name))
   if (prunedSelected.length !== liveSelectedClasses.length) {
     liveSelectedClasses = prunedSelected
     setSelectedClasses(prunedSelected)
     if (rememberedSelectedClasses != null) rememberedSelectedClasses = prunedSelected
   }
-  if (rememberedSelectedClasses === null && classNames.length > 0 && liveSelectedClasses.length === 0) {
+  // After page entry / race change (or empty prune), select the first class.
+  if (rememberedSelectedClasses === null && classNames.length > 0) {
     const initial = [classNames[0]!]
     liveSelectedClasses = initial
     rememberedSelectedClasses = initial
