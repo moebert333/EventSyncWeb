@@ -3,15 +3,72 @@ import type { EventClassResult } from '../types/database'
 export type ScoringKey = 'race1_place' | 'race2_place' | 'race3_place' | 'finals_place'
 
 const MOTO_KEYS: ScoringKey[] = ['race1_place', 'race2_place', 'race3_place']
-const NON_NUMERIC_SCORE = 80
+/** Fallback finish code when a scoring cell is empty and no DNS row exists in event_points. */
+export const DEFAULT_DNS_POSITION = 80
 const MAX_SCHEMA_MOTOS = 3
+
+const RESULT_STATUS_CODES = new Set(['dnf', 'dns', 'dsq'])
 
 export type RaceSessionForMaxMoto = {
   session_name: string | null
   class_ids: number[]
 }
 
-/** Parse a place label to a positive integer; DNS/DNF/empty → null. */
+export type EventPointsStatusRow = {
+  position: number
+  status: string | null
+}
+
+/** True when event_points.status is a result status to show (DNF / DNS / DSQ). */
+export function isResultStatus(status: string | null | undefined): boolean {
+  if (status == null || status.trim() === '') return false
+  return RESULT_STATUS_CODES.has(status.trim().toLowerCase())
+}
+
+/** Position of the DNS row in event_points; falls back to DEFAULT_DNS_POSITION. */
+export function dnsPositionFromPoints(rows: EventPointsStatusRow[]): number {
+  for (const row of rows) {
+    if (row.status != null && row.status.trim().toLowerCase() === 'dns') {
+      return row.position
+    }
+  }
+  return DEFAULT_DNS_POSITION
+}
+
+/** Map finish position → status text for statuses that should be shown. */
+export function statusByPositionFromPoints(rows: EventPointsStatusRow[]): Map<number, string> {
+  const map = new Map<number, string>()
+  for (const row of rows) {
+    if (!isResultStatus(row.status)) continue
+    map.set(row.position, row.status!.trim())
+  }
+  return map
+}
+
+/**
+ * Display label for a place cell: Status text (DNF/DNS/DSQ) when the numeric
+ * finish maps to event_points.status; otherwise the number or —.
+ */
+export function formatPlaceLabel(
+  value: string | number | null | undefined,
+  statusByPosition: Map<number, string> | Record<number, string> = new Map(),
+): string {
+  if (value == null || value === '') return '—'
+  const parsed = parsePlaceValue(value)
+  if (parsed != null) {
+    const status =
+      statusByPosition instanceof Map
+        ? statusByPosition.get(parsed)
+        : statusByPosition[parsed]
+    if (isResultStatus(status)) return status!.trim()
+    return String(parsed)
+  }
+  const text = String(value).trim()
+  if (isResultStatus(text)) return text
+  return text || '—'
+}
+
+/** Parse a place label to a positive integer; status text/empty → null. Values > 80 kept. */
 export function parsePlaceValue(label: string | number | null | undefined): number | null {
   if (label == null || label === '') return null
   if (typeof label === 'number') {
@@ -78,8 +135,14 @@ function columnHasAnyValue(rows: EventClassResult[], key: ScoringKey): boolean {
   return rows.some((row) => hasColumnValue(row[key]))
 }
 
+/** Finish that unlocks Points: positive place ≤ 80. DNF/DNS/DSQ codes (>80) do not. */
+function isPointsUnlockFinish(value: string | number | null | undefined): boolean {
+  const parsed = parsePlaceValue(value)
+  return parsed != null && parsed <= 80
+}
+
 function columnHasNumericScore(rows: EventClassResult[], key: ScoringKey): boolean {
-  return rows.some((row) => parsePlaceValue(row[key]) != null)
+  return rows.some((row) => isPointsUnlockFinish(row[key]))
 }
 
 export function motoKeysUpTo(maxMoto: number): ScoringKey[] {
@@ -104,12 +167,12 @@ export function activeScoringKeys(
   return []
 }
 
-/** Every moto 1…maxMoto has at least one numeric place > 0 in the class. */
+/** Every moto 1…maxMoto has at least one finish ≤ 80 in the class. */
 export function motosFullyScored(rows: EventClassResult[], maxMoto: number): boolean {
   return motoKeysUpTo(maxMoto).every((key) => columnHasNumericScore(rows, key))
 }
 
-/** At least one moto 1…maxMoto has a numeric place > 0 in the class. */
+/** At least one moto 1…maxMoto has a finish ≤ 80 in the class. */
 export function anyMotoScored(rows: EventClassResult[], maxMoto: number): boolean {
   return motoKeysUpTo(maxMoto).some((key) => columnHasNumericScore(rows, key))
 }
@@ -123,11 +186,12 @@ export function requireAllMotosFromEnv(
   return normalized === 'true' || normalized === '1'
 }
 
-function scoreForColumn(row: EventClassResult, key: ScoringKey): number {
+function scoreForColumn(row: EventClassResult, key: ScoringKey, dnsPosition: number): number {
   const parsed = parsePlaceValue(row[key])
-  return parsed ?? NON_NUMERIC_SCORE
+  return parsed ?? dnsPosition
 }
 
+/** Any positive finish (including >80) counts for Place ranking; empty does not. */
 function riderHasAnyNumericScore(row: EventClassResult, keys: ScoringKey[]): boolean {
   return keys.some((key) => parsePlaceValue(row[key]) != null)
 }
@@ -189,6 +253,7 @@ export function enrichClassResults(
   rows: EventClassResult[],
   pointsByPosition: Map<number, number>,
   maxMoto: number | null = null,
+  dnsPosition: number = DEFAULT_DNS_POSITION,
 ): EventClassResult[] {
   const needsFullCalc = classNeedsPointsCalc(rows)
   const needsPointsOnly = classNeedsPointsOnlyFill(rows)
@@ -211,11 +276,11 @@ export function enrichClassResults(
   const lastKey = keys[keys.length - 1]!
   const ranked: RankedRider[] = rows.map((row) => {
     const allNonNumeric = !riderHasAnyNumericScore(row, keys)
-    const sum = keys.reduce((total, key) => total + scoreForColumn(row, key), 0)
+    const sum = keys.reduce((total, key) => total + scoreForColumn(row, key, dnsPosition), 0)
     return {
       row,
       sum,
-      lastScore: scoreForColumn(row, lastKey),
+      lastScore: scoreForColumn(row, lastKey, dnsPosition),
       allNonNumeric,
     }
   })
@@ -243,6 +308,7 @@ export function enrichEventResults(
   rows: EventClassResult[],
   pointsByPosition: Map<number, number>,
   maxMotoByClass: Map<number, number> = new Map(),
+  dnsPosition: number = DEFAULT_DNS_POSITION,
 ): EventClassResult[] {
   const byClass = new Map<number, EventClassResult[]>()
   for (const row of rows) {
@@ -253,7 +319,7 @@ export function enrichEventResults(
   const enriched: EventClassResult[] = []
   for (const [classId, classRows] of byClass.entries()) {
     const maxMoto = maxMotoByClass.get(classId) ?? null
-    enriched.push(...enrichClassResults(classRows, pointsByPosition, maxMoto))
+    enriched.push(...enrichClassResults(classRows, pointsByPosition, maxMoto, dnsPosition))
   }
   return enriched
 }

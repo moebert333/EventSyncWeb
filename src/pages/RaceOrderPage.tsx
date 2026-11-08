@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { EventParticipantHeader } from '../components/EventParticipantHeader'
 import { Skeleton } from '../components/Skeleton'
 import { statusToneClass } from '../components/StatusPill'
@@ -13,6 +13,7 @@ import {
   useParticipantRaceNums,
 } from '../hooks/useEventRaceOrder'
 import { formatRaceTitle, formatSessionName, riderName, sessionsShareCommonPrefix } from '../lib/format'
+import { saveRaceAsResultsSelection } from '../lib/resultsSelection'
 import type { EntryParticipant, EventRaceOrderClass, EventRaceOrderRow } from '../types/database'
 
 /** Fallback when sticky bars cannot be measured yet. */
@@ -202,14 +203,20 @@ function RaceRow({
   activeRace: EventRaceOrderRow | null
   stripSessionPrefix: boolean
 }) {
+  const navigate = useNavigate()
   const [openClassIds, setOpenClassIds] = useState<number[]>([])
-  // Order: Rider, Completed, then Active / exact status.
+  // Order: Rider, Completed, then Active / exact status. Practices never show Completed.
   const labels: string[] = []
   if (isParticipantRace) labels.push('Rider')
-  if (race.completed) labels.push('Completed')
+  if (race.completed && !race.is_practice) labels.push('Completed')
   if (race.active) {
     // Exact status (Staging / Paused / …) only when the selected rider is in this race.
     labels.push(isParticipantRace ? (race.status ?? 'Active') : 'Active')
+  }
+
+  function openRaceResults() {
+    saveRaceAsResultsSelection(eventId, race.race_id)
+    navigate('/results')
   }
 
   const raceTitle = formatRaceTitle(race.race_num, race.is_practice, race.race_name)
@@ -231,9 +238,13 @@ function RaceRow({
   function onRowBackgroundClick(event: MouseEvent<HTMLLIElement>) {
     const target = event.target
     if (!(target instanceof Element)) return
-    // Keep class toggles, View Race, and rider selection working.
+    // Keep class name toggles, View Race/Practice link, and rider selection working.
     if (target.closest('a, button')) return
-    // Row click only collapses; class name buttons are the sole expand path.
+    if (race.active) {
+      navigate('/live')
+      return
+    }
+    // Non-active row click only collapses; class name buttons are the sole expand path.
     if (openClassIds.length > 0) setOpenClassIds([])
   }
 
@@ -242,17 +253,35 @@ function RaceRow({
       id={`race-order-${race.race_id}`}
       className={`cursor-pointer border ${RACE_SCROLL_MARGIN} ${raceTone(race, isParticipantRace, activeRace)}`}
       onClick={onRowBackgroundClick}
+      title={
+        race.active
+          ? race.is_practice
+            ? 'Go to the Active Practice page'
+            : 'Go to the Active Race page'
+          : undefined
+      }
     >
       <div className="min-h-11 px-3 py-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="font-display text-xl font-bold uppercase">{raceTitle}</span>
           {labels.map((label) => (
             <span key={label} className="inline-flex items-center gap-x-2">
-              <span
-                className={`inline-flex px-2 py-0.5 text-xs font-bold uppercase ${badgeClass(label)}`}
-              >
-                {label}
-              </span>
+              {label === 'Completed' ? (
+                <button
+                  type="button"
+                  className={`inline-flex cursor-pointer px-2 py-0.5 text-xs font-bold uppercase ${badgeClass(label)}`}
+                  title="View results for this race"
+                  onClick={openRaceResults}
+                >
+                  Completed
+                </button>
+              ) : (
+                <span
+                  className={`inline-flex px-2 py-0.5 text-xs font-bold uppercase ${badgeClass(label)}`}
+                >
+                  {label}
+                </span>
+              )}
               {label === 'Rider' && participantDisplayName ? (
                 <span className="text-sm font-semibold normal-case text-sky-300">
                   {participantDisplayName}

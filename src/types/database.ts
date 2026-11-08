@@ -111,26 +111,29 @@ export type EventClassResult = {
   event_name: string
   class_id: number
   class_name: string
-  overall_place: string | null
+  /** Integer finish from event_results; may be string after client Place enrichment. */
+  overall_place: string | number | null
   participant_id: number
   first_name: string
   last_name: string
   participant_plate: string | null
   make: string | null
   overall_points: number | null
-  race1_place: string | null
-  race2_place: string | null
-  race3_place: string | null
-  semi1_place: string | null
-  semi2_place: string | null
-  lcq_place: string | null
-  finals_place: string | null
+  race1_place: string | number | null
+  race2_place: string | number | null
+  race3_place: string | number | null
+  semi1_place: string | number | null
+  semi2_place: string | number | null
+  lcq_place: string | number | null
+  finals_place: string | number | null
 }
 
 export type EventPointsRow = {
   event_id: number
   position: number
   points: number
+  /** Result status for this finish code; DNF / DNS / DSQ for positions typically > 80. */
+  status: string | null
 }
 
 export type ClassRow = {

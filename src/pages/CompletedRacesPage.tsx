@@ -13,7 +13,7 @@ import {
   type ResultsFilter,
 } from '../hooks/useEventResults'
 import { formatEventDate, riderName } from '../lib/format'
-import { motoKeysUpTo } from '../lib/resultsPoints'
+import { formatPlaceLabel, motoKeysUpTo } from '../lib/resultsPoints'
 import {
   clearResultsSelection,
   loadResultsSelection,
@@ -38,6 +38,10 @@ const OPTIONAL_COLUMNS: { key: keyof EventClassResult; label: string }[] = [
 function cell(value: string | number | null): string {
   if (value == null || value === '') return '—'
   return String(value)
+}
+
+function isPlaceColumn(key: keyof EventClassResult): boolean {
+  return key === 'overall_place' || key.endsWith('_place')
 }
 
 function optionalColumnsFor(rows: EventClassResult[], maxMoto: number | null) {
@@ -290,6 +294,7 @@ export function CompletedRacesPage() {
 
   const rows = resultsQuery.data?.rows ?? []
   const maxMotoByClass = resultsQuery.data?.maxMotoByClass ?? {}
+  const statusByPosition = resultsQuery.data?.statusByPosition ?? {}
   const classGroups = groupResultsByClass(rows)
   const collapsibleClasses = classGroups.length > 1
   const loading = seriesQuery.isLoading || eventsQuery.isLoading
@@ -657,11 +662,18 @@ export function CompletedRacesPage() {
                               key={`${row.class_id}-${row.participant_id}`}
                               className={isSelectedParticipant ? 'is-selected' : undefined}
                             >
-                              <td>{cell(row.overall_place)}</td>
+                              <td>{formatPlaceLabel(row.overall_place, statusByPosition)}</td>
                               <td>{cell(row.participant_plate)}</td>
                               <td>{riderName(row.first_name, row.last_name)}</td>
                               {optional.map((column) => (
-                                <td key={column.key}>{cell(row[column.key] as string | number | null)}</td>
+                                <td key={column.key}>
+                                  {isPlaceColumn(column.key)
+                                    ? formatPlaceLabel(
+                                        row[column.key] as string | number | null,
+                                        statusByPosition,
+                                      )
+                                    : cell(row[column.key] as string | number | null)}
+                                </td>
                               ))}
                             </tr>
                           )

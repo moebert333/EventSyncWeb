@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatRaceTitle, placeRank } from '../lib/format'
-import { enrichEventResults, maxMotoByClassId } from '../lib/resultsPoints'
+import {
+  dnsPositionFromPoints,
+  enrichEventResults,
+  maxMotoByClassId,
+  statusByPositionFromPoints,
+} from '../lib/resultsPoints'
 import { supabase } from '../lib/supabase'
 import type {
   ClassRow,
@@ -29,6 +34,8 @@ export type EventResultsData = {
   rows: EventClassResult[]
   /** Largest scheduled MOTO n per class_id from Race Order sessions. */
   maxMotoByClass: Record<number, number>
+  /** Finish position → DNF/DNS/DSQ status text from event_points. */
+  statusByPosition: Record<number, string>
 }
 
 function toMaxMotoRecord(map: Map<number, number>): Record<number, number> {
@@ -169,7 +176,7 @@ export function useEventResults(filter: ResultsFilter | null) {
             ].map((row) => row.class_id),
           ),
         ]
-        if (classIds.length === 0) return { rows: [], maxMotoByClass: {} }
+        if (classIds.length === 0) return { rows: [], maxMotoByClass: {}, statusByPosition: {} }
         query = query.in('class_id', classIds)
       } else if (filter!.raceId != null) {
         const { data: raceClasses, error: raceClassError } = await supabase
@@ -180,13 +187,13 @@ export function useEventResults(filter: ResultsFilter | null) {
         const classIds = [
           ...new Set(((raceClasses ?? []) as { class_id: number }[]).map((row) => row.class_id)),
         ]
-        if (classIds.length === 0) return { rows: [], maxMotoByClass: {} }
+        if (classIds.length === 0) return { rows: [], maxMotoByClass: {}, statusByPosition: {} }
         query = query.in('class_id', classIds)
       }
 
       const [resultsResponse, pointsResponse, racesResponse] = await Promise.all([
         query,
-        supabase.from('event_points').select('event_id, position, points').eq('event_id', eventId),
+        supabase.from('event_points').select('event_id, position, points, status').eq('event_id', eventId),
         supabase.from('races').select('race_id, session_name').eq('event_id', eventId),
       ])
       if (resultsResponse.error) throw resultsResponse.error
@@ -216,15 +223,19 @@ export function useEventResults(filter: ResultsFilter | null) {
         )
       }
 
+      const pointsRows = (pointsResponse.data ?? []) as EventPointsRow[]
       const pointsByPosition = new Map<number, number>()
-      for (const row of (pointsResponse.data ?? []) as EventPointsRow[]) {
+      for (const row of pointsRows) {
         pointsByPosition.set(row.position, row.points)
       }
+      const statusByPositionMap = statusByPositionFromPoints(pointsRows)
+      const dnsPosition = dnsPositionFromPoints(pointsRows)
 
       const rows = enrichEventResults(
         (resultsResponse.data ?? []) as EventClassResult[],
         pointsByPosition,
         maxMotoByClass,
+        dnsPosition,
       )
       rows.sort(
         (a, b) =>
@@ -232,7 +243,11 @@ export function useEventResults(filter: ResultsFilter | null) {
           placeRank(a.overall_place) - placeRank(b.overall_place) ||
           a.last_name.localeCompare(b.last_name),
       )
-      return { rows, maxMotoByClass: toMaxMotoRecord(maxMotoByClass) }
+      const statusByPosition: Record<number, string> = {}
+      for (const [position, status] of statusByPositionMap.entries()) {
+        statusByPosition[position] = status
+      }
+      return { rows, maxMotoByClass: toMaxMotoRecord(maxMotoByClass), statusByPosition }
     },
   })
 }

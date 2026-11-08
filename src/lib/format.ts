@@ -139,9 +139,13 @@ export function formatRaceTitle(
   return `${numberLabel} · ${name}`
 }
 
-export function placeRank(place: string | null | undefined): number {
+export function placeRank(place: string | number | null | undefined): number {
   if (place == null || place === '') return 10_000
-  if (place === 'DNS/DNF') return 9_000
+  if (typeof place === 'number') {
+    return Number.isFinite(place) ? place : 8_000
+  }
+  const upper = place.trim().toUpperCase()
+  if (upper === 'DNS/DNF' || upper === 'DNS' || upper === 'DNF' || upper === 'DSQ') return 9_000
   const numeric = Number(place)
   return Number.isFinite(numeric) ? numeric : 8_000
 }

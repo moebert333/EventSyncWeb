@@ -81,6 +81,25 @@ export function saveParticipantAsResultsSelection(eventId: number, participantId
   })
 }
 
+/** Point Results page selection at this race (preserves series filter when possible). */
+export function saveRaceAsResultsSelection(eventId: number, raceId: number) {
+  const existing = loadResultsSelection()
+  saveResultsSelection({
+    seriesFilter: existing?.eventId === eventId ? existing.seriesFilter : 'all',
+    eventId,
+    mode: 'race',
+    className: '',
+    participantId: '',
+    raceId,
+    request: {
+      eventId,
+      className: null,
+      participantId: null,
+      raceId,
+    },
+  })
+}
+
 export function clearResultsSelection() {
   localStorage.removeItem(RESULTS_SELECTION_KEY)
 }
