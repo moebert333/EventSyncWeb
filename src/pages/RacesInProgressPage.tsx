@@ -288,7 +288,9 @@ export function RacesInProgressPage() {
   )
   const raceId = raceQuery.data?.race_id ?? null
   /** Full lap history from `active_race_timing` (PK includes current_lap_num). */
-  const allTimingRows = timingQuery.data ?? []
+  const allTimingRows = (timingQuery.data ?? []).filter(
+    (row) => !(row.first_name ?? '').startsWith('0000'),
+  )
   /** Live table shows only the latest lap per class + participant. */
   const timingRows = latestTimingRows(allTimingRows)
   const groups = groupByClass(timingRows)
