@@ -11,9 +11,13 @@ const links = [
 
 /** Hold duration to open simulation (touch / pointer analogue to Ctrl+click). */
 const SIM_LONG_PRESS_MS = 1800
+/** Cancel brand long-press only after the pointer moves this far (px). */
+const SIM_LONG_PRESS_MOVE_CANCEL_PX = 12
 
 /** Ignore hamburger taps briefly after a route change (mobile click-through). */
 const MENU_NAV_GUARD_MS = 450
+
+const LIVE_PATH = '/live'
 
 /** Matches Tailwind `gap-3` between brand / nav / hamburger. */
 const SECTION_GAP_PX = 12
@@ -36,8 +40,10 @@ export function Header() {
   const [visibleCount, setVisibleCount] = useState(links.length)
   const open = menuPath === location.pathname
   const longPressTimer = useRef<number | null>(null)
+  const longPressOrigin = useRef<{ x: number; y: number } | null>(null)
   const suppressBrandClick = useRef(false)
   const menuNavGuardUntil = useRef(0)
+  const onLivePage = location.pathname === LIVE_PATH
   const rowRef = useRef<HTMLDivElement>(null)
   const brandRef = useRef<HTMLAnchorElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
@@ -125,6 +131,7 @@ export function Header() {
       window.clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
+    longPressOrigin.current = null
   }
 
   function openSimulationFromBrand(event: { preventDefault: () => void; stopPropagation: () => void }) {
@@ -135,6 +142,10 @@ export function Header() {
     clearLongPress()
     simulation.openDialog()
   }
+
+  /** Long-press opens simulation while on Active Race (or while a sim is already running). */
+  const brandLongPressEnabled =
+    simulation != null && (onLivePage || Boolean(simulation.isActive))
 
   return (
     <header
@@ -149,7 +160,11 @@ export function Header() {
           ref={brandRef}
           to="/"
           className="flex min-h-11 shrink-0 touch-manipulation items-center gap-2 select-none"
-          title="Go to Home (Ctrl+click or long-press on Active Race for simulation)"
+          title={
+            brandLongPressEnabled
+              ? 'Go to Home (Ctrl+click or long-press for race simulation)'
+              : 'Go to Home (Ctrl+click or long-press on Active Race for simulation)'
+          }
           onClick={(event) => {
             if (suppressBrandClick.current) {
               event.preventDefault()
@@ -161,20 +176,31 @@ export function Header() {
             openSimulationFromBrand(event)
           }}
           onPointerDown={(event) => {
-            if (!simulation || event.button !== 0) return
+            if (!brandLongPressEnabled || event.button !== 0) return
             clearLongPress()
+            longPressOrigin.current = { x: event.clientX, y: event.clientY }
             longPressTimer.current = window.setTimeout(() => {
               longPressTimer.current = null
+              longPressOrigin.current = null
               suppressBrandClick.current = true
               simulation.openDialog()
             }, SIM_LONG_PRESS_MS)
           }}
+          onPointerMove={(event) => {
+            const origin = longPressOrigin.current
+            if (origin == null) return
+            if (
+              Math.hypot(event.clientX - origin.x, event.clientY - origin.y) >
+              SIM_LONG_PRESS_MOVE_CANCEL_PX
+            ) {
+              clearLongPress()
+            }
+          }}
           onPointerUp={clearLongPress}
-          onPointerLeave={clearLongPress}
           onPointerCancel={clearLongPress}
           onContextMenu={(event) => {
             // Avoid the native callout stealing a long-press meant for simulation.
-            if (simulation) event.preventDefault()
+            if (brandLongPressEnabled) event.preventDefault()
           }}
         >
           <img src="/rider.svg" alt="" className="h-10 w-14" draggable={false} />

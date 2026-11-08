@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEventCode } from '../hooks/useEventCode'
 import { useEventParticipants } from '../hooks/useEventResults'
@@ -18,7 +18,19 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
   const { selectedParticipant, setSelectedParticipant } = useEventCode()
   const ridersQuery = useEventParticipants(eventId)
   const [riderSearch, setRiderSearch] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const showActions = onOk != null || onSkip != null
+
+  useEffect(() => {
+    const input = searchInputRef.current
+    if (!input) return
+    // Defer so the portal is in the document before focusing.
+    const id = window.requestAnimationFrame(() => {
+      input.focus()
+      input.select()
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [])
 
   const selectedForEvent =
     selectedParticipant?.eventId === eventId ? selectedParticipant : null
@@ -74,6 +86,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
         <label className="block text-sm uppercase tracking-wide text-zinc-400">
           Search name or plate
           <input
+            ref={searchInputRef}
             className="control mt-1"
             title="Filter riders by name or plate"
             value={riderSearch}
