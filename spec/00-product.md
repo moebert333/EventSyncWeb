@@ -21,7 +21,7 @@ EventSync is a public website and installable PWA for racers and spectators at a
 2. Optionally pick a Selected participant on Home (search name/plate) to carry into live timing and completed results.
 3. See that a race is staging / in progress / paused, choose one class, and follow live participant timing plus a place and lap-time progress chart.
 4. Browse completed event results, filter by series → event → class or participant.
-5. See the event race order by race number, with completed/active markers and Selected participant races highlighted; see Staging in countdown beside the participant.
+5. See the event race order by race number, with completed/active markers and Selected participant races highlighted; see Warning text in the Event/Rider header and Warning Popup / notifications when staging or in-race.
 6. Install the site on a phone home screen and reopen it without signing in (public pages).
 7. An allowlisted organizer signs in with a magic link and creates/edits organization, series, events, and Event Codes.
 

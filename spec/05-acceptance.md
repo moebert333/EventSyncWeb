@@ -67,8 +67,9 @@ PWA after Home + Admin work, not before Event Code resolution.
 
 - [ ] Uses `race_in_progress` + `active_race_timing` (+ class names view)
 - [ ] Zero rows → empty state, not a crash
-- [ ] Top Event / clickable Participant (or Select Participant) header with Staging in: N when a participant has an upcoming race (yellow at 2, flashing at 1); one live race shows race number, session, status, and class list
-- [ ] Status pill colors: Waiting light grey, Staging light orange, Active green, Paused yellow, Finished light blue (contrasting text); click shows `Race status: {status}`
+- [ ] Shared Event / Rider header strip with Warning text (Title Box link) and Warning Popup per `03-ui.md` rules (race_num gap; Practice wording except rule 1; yellow bg → black text; flash only for in-Staging Title “You are in this Race” and Staging/in-race popups)
+- [ ] Warning Popup notifies when popup message changes or active race changes; one live race shows race number, session, status, and class list
+- [ ] Status pill colors: Waiting light grey, Staging lighter orange, Active green, Paused yellow, Finished light blue (contrasting text); click shows `Race status: {status}`
 - [ ] Class chips are buttons. One class is selected (accent background), or All Classes to the right of the chips. Only that class table is shown unless All Classes is selected. First class is selected on load.
 - [ ] Switching to the page with a Selected participant who is in the race selects that class/row and opens the chart (once per shown race)
 - [ ] One row per participant in the selected class. No Class column. A single class starts sorted by place. All Classes lists every class, adds a Class column, and defaults to Class then Place. Clicking any column header sorts that table; clicking it again reverses the order. Best lap shows as `#n - time`.
@@ -131,7 +132,7 @@ PWA after Home + Admin work, not before Event Code resolution.
 ## H. Race Order
 
 - [ ] `/order` requires Event Code context
-- [ ] Same Event / Participant header with Staging in countdown
+- [ ] Same Event / Rider header strip with Warning text + Warning Popup rules as Live
 - [ ] Races listed by `race_num` with expand for class names
 - [ ] Completed / Active / Participant marked by color and label
 - [ ] Empty and error states handled
