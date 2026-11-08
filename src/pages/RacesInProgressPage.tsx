@@ -29,7 +29,7 @@ type HighlightMode = 'firstPlace' | 'bestLap' | 'participant'
 
 const HIGHLIGHT_LABELS: Record<HighlightMode, string> = {
   firstPlace: '1st Place',
-  bestLap: 'Best Lap Time',
+  bestLap: 'Lap Time',
   participant: 'Rider',
 }
 
@@ -242,8 +242,8 @@ let rememberedPanelRaceId: number | null | undefined = undefined
 /** True until the user hides video or opens the chart — so first /live visit shows video. */
 let rememberedVideoOpen = true
 let rememberedChartOpen = false
-let rememberedPickedClass: string | null = null
-let rememberedAllClasses = false
+/** Selected class chips to show; `null` means default to the first class once names load. */
+let rememberedSelectedClasses: string[] | null = null
 /** `classId-participantId` from the last selected table row. */
 let rememberedSelectedKey: string | null = null
 /** Last race status seen on this page; used to open Video only on status change. */
@@ -286,8 +286,9 @@ export function RacesInProgressPage() {
   )
   /** Unset until the first successful load; then tracks the shown race id. */
   const [selectionRaceId, setSelectionRaceId] = useState<number | null | undefined>(undefined)
-  const [pickedClass, setPickedClass] = useState<string | null>(() => rememberedPickedClass)
-  const [allClasses, setAllClasses] = useState(() => rememberedAllClasses)
+  const [selectedClasses, setSelectedClasses] = useState<string[]>(
+    () => rememberedSelectedClasses ?? [],
+  )
   const [sort, setSort] = useState<SortState>(PLACE_SORT)
   const [selectedKey, setSelectedKey] = useState<string | null>(() => rememberedSelectedKey)
   const [chartOpen, setChartOpen] = useState(() => rememberedChartOpen)
@@ -367,20 +368,17 @@ export function RacesInProgressPage() {
 
   // Local copies so same-render chart/selection logic sees restored values (setState is async).
   let liveSelectedKey = selectedKey
-  let livePickedClass = pickedClass
-  let liveAllClasses = allClasses
+  let liveSelectedClasses = selectedClasses
 
   if (raceQuery.isSuccess && selectionRaceId !== raceId) {
     const eventId = context?.eventId ?? null
     const raceChanged =
       rememberedPanelEventId !== eventId || rememberedPanelRaceId !== raceId
     setSelectionRaceId(raceId)
-    // Keep last class chip (or none → UI falls back to first class); do not jump to the participant's class.
-    livePickedClass = rememberedPickedClass
-    liveAllClasses = rememberedAllClasses
+    // Keep last class chip selection (or none → UI falls back to first class).
+    liveSelectedClasses = rememberedSelectedClasses ?? []
     liveSelectedKey = rememberedSelectedKey
-    setPickedClass(livePickedClass)
-    setAllClasses(liveAllClasses)
+    setSelectedClasses(liveSelectedClasses)
     setSort(PLACE_SORT)
     setSelectedKey(liveSelectedKey)
     // Always restore last chart/video view on remount; status changes switch to Video separately.
@@ -391,6 +389,20 @@ export function RacesInProgressPage() {
       rememberedPanelEventId = eventId
       rememberedPanelRaceId = raceId
     }
+  }
+
+  // Drop chips for classes that left this race; default to first class on first visit.
+  const prunedSelected = liveSelectedClasses.filter((name) => classNames.includes(name))
+  if (prunedSelected.length !== liveSelectedClasses.length) {
+    liveSelectedClasses = prunedSelected
+    setSelectedClasses(prunedSelected)
+    if (rememberedSelectedClasses != null) rememberedSelectedClasses = prunedSelected
+  }
+  if (rememberedSelectedClasses === null && classNames.length > 0 && liveSelectedClasses.length === 0) {
+    const initial = [classNames[0]!]
+    liveSelectedClasses = initial
+    rememberedSelectedClasses = initial
+    setSelectedClasses(initial)
   }
 
   if (
@@ -460,11 +472,10 @@ export function RacesInProgressPage() {
     rememberedPanelRaceId = selectionRaceId
     rememberedVideoOpen = videoOpen
     rememberedChartOpen = chartOpen
-    rememberedPickedClass = pickedClass
-    rememberedAllClasses = allClasses
+    rememberedSelectedClasses = selectedClasses
     // Do not clobber a stored rider with a transient null before timing/restore settles.
     if (selectedKey != null) rememberedSelectedKey = selectedKey
-  }, [selectionRaceId, videoOpen, chartOpen, pickedClass, allClasses, selectedKey])
+  }, [selectionRaceId, videoOpen, chartOpen, selectedClasses, selectedKey])
 
   if (!context) return <Navigate to="/?needCode=1" replace />
 
@@ -540,16 +551,19 @@ export function RacesInProgressPage() {
   }
 
   const sessionLabel = formatSessionName(race.session_name, true)
-  const showingAll = liveAllClasses && classNames.length > 0
-  const activeClass = showingAll
-    ? null
-    : livePickedClass != null && classNames.includes(livePickedClass)
-      ? livePickedClass
-      : (classNames[0] ?? null)
-  const classRows = activeClass ? (groups.get(activeClass) ?? []) : []
-  const visibleRows = (showingAll ? timingRows : classRows).slice().sort((a, b) => compareRows(a, b, sort))
-  const sectionLabel = showingAll ? 'All Classes' : activeClass
-  const tableColumns: SortColumn[] = showingAll
+  const selectedVisible = classNames.filter((name) => liveSelectedClasses.includes(name))
+  const showingMultiple = selectedVisible.length !== 1
+  const visibleRows = timingRows
+    .filter((row) => selectedVisible.includes(row.class_name))
+    .slice()
+    .sort((a, b) => compareRows(a, b, sort))
+  const sectionLabel =
+    selectedVisible.length === 0
+      ? null
+      : selectedVisible.length === 1
+        ? selectedVisible[0]!
+        : selectedVisible.join(', ')
+  const tableColumns: SortColumn[] = showingMultiple
     ? ['class', 'place', 'plate', 'rider', 'lap', 'lapTime', 'bestLap', 'elapsed', 'leaderGap', 'nextGap', 'status']
     : ['place', 'plate', 'rider', 'lap', 'lapTime', 'bestLap', 'elapsed', 'leaderGap', 'nextGap', 'status']
   const chooseSort = (column: SortColumn) => {
@@ -558,6 +572,20 @@ export function RacesInProgressPage() {
         ? { column, direction: current.direction === 'asc' ? 'desc' : 'asc' }
         : { column, direction: 'asc' },
     )
+  }
+
+  function toggleClass(name: string) {
+    const current = classNames.filter((n) => liveSelectedClasses.includes(n))
+    const next = current.includes(name)
+      ? current.filter((n) => n !== name)
+      : classNames.filter((n) => current.includes(n) || n === name)
+    rememberedSelectedClasses = next
+    setSelectedClasses(next)
+    if (next.length !== 1) {
+      setSort(DEFAULT_SORT)
+    } else if (sort.column === 'class') {
+      setSort(PLACE_SORT)
+    }
   }
   const highlighted = highlightRow(visibleRows, highlightMode, selectedParticipant?.participantId ?? null)
   const highlightKey = highlighted ? rowKey(highlighted) : null
@@ -641,13 +669,13 @@ export function RacesInProgressPage() {
           }}
         />
       ) : null}
-      <header className="border-b border-[#f5c518] pb-4">
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-4xl font-extrabold uppercase">
-            {formatRaceTitle(race.race_num, race.is_practice, race.race_name)}
+      <header className="!mt-1 border-b border-[#f5c518] pb-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="font-display text-3xl font-extrabold uppercase leading-tight">
+            {sessionLabel ?? formatRaceTitle(race.race_num, race.is_practice, race.race_name)}
           </h1>
           <StatusPill status={race.status} />
-          <div className="ml-auto flex items-center gap-3 pr-2">
+          <div className="ml-auto flex items-center gap-2 pr-2">
             <button
               type="button"
               className={`inline-flex h-11 w-11 cursor-pointer items-center justify-center border ${
@@ -678,16 +706,10 @@ export function RacesInProgressPage() {
             ) : null}
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <p className="text-zinc-300">
-            {sessionLabel}
-            {race.status === 'Active' || race.status === 'Paused' || race.status === 'Finished' ? (
-              <>
-                {sessionLabel ? ' · ' : ''}
-                <span className="font-semibold tabular-nums text-zinc-100">Elapsed Time: {elapsedDisplay}</span>
-              </>
-            ) : null}
-          </p>
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          {race.status === 'Active' || race.status === 'Paused' || race.status === 'Finished' ? (
+            <p className="font-semibold tabular-nums text-zinc-100">Elapsed Time: {elapsedDisplay}</p>
+          ) : null}
           {videoOpen ? (
             <button
               type="button"
@@ -738,46 +760,25 @@ export function RacesInProgressPage() {
           </div>
         ) : null}
         {classNames.length > 0 ? (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <div className="contents" role="group" aria-label="Race classes">
               {classNames.map((name) => {
-                const selected = name === activeClass
+                const selected = selectedVisible.includes(name)
                 return (
                   <button
                     key={name}
                     type="button"
                     aria-pressed={selected}
-                    title={`Show ${name} timing`}
-                    className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
+                    title={selected ? `Hide ${name} timing` : `Show ${name} timing`}
+                    className={`min-h-8 cursor-pointer border px-2 py-0.5 text-xs font-semibold uppercase leading-tight ${
                       selected ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
                     }`}
-                    onClick={() => {
-                      rememberedAllClasses = false
-                      rememberedPickedClass = name
-                      setAllClasses(false)
-                      setPickedClass(name)
-                      setSort((current) => (current.column === 'class' ? PLACE_SORT : current))
-                    }}
+                    onClick={() => toggleClass(name)}
                   >
                     {name}
                   </button>
                 )
               })}
-              <button
-                type="button"
-                aria-pressed={showingAll}
-                title="Show timing for all classes"
-                className={`min-h-11 cursor-pointer border px-3 py-2 text-sm font-semibold uppercase ${
-                  showingAll ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
-                }`}
-                onClick={() => {
-                  rememberedAllClasses = true
-                  setAllClasses(true)
-                  setSort(DEFAULT_SORT)
-                }}
-              >
-                All Classes
-              </button>
             </div>
             <div className="relative ml-auto shrink-0" ref={highlightMenuRef}>
               <button
@@ -838,10 +839,14 @@ export function RacesInProgressPage() {
         <p className="panel">No timing rows for this race yet.</p>
       ) : null}
 
-      {!timingQuery.isLoading && !timingQuery.error && (showingAll || activeClass) ? (
+      {!timingQuery.isLoading && !timingQuery.error && selectedVisible.length > 0 ? (
         <section aria-label={sectionLabel ?? undefined}>
           {visibleRows.length === 0 ? (
-            <p className="panel">{showingAll ? 'No timing rows yet.' : 'No timing rows for this class yet.'}</p>
+            <p className="panel">
+              {selectedVisible.length === 1
+                ? 'No timing rows for this class yet.'
+                : 'No timing rows for the selected classes yet.'}
+            </p>
           ) : (
             <div className="table-wrap table-wrap-live">
               <table className="data">
@@ -882,20 +887,14 @@ export function RacesInProgressPage() {
                         title={`Select ${riderName(row.first_name, row.last_name)} for the chart`}
                         onClick={() => {
                           rememberedSelectedKey = key
-                          if (!showingAll && activeClass) {
-                            rememberedPickedClass = activeClass
-                            rememberedAllClasses = false
-                          }
+                          rememberedSelectedClasses = selectedVisible
                           setSelectedKey(key)
                         }}
                         onKeyDown={(event) => {
                           if (event.key !== 'Enter' && event.key !== ' ') return
                           event.preventDefault()
                           rememberedSelectedKey = key
-                          if (!showingAll && activeClass) {
-                            rememberedPickedClass = activeClass
-                            rememberedAllClasses = false
-                          }
+                          rememberedSelectedClasses = selectedVisible
                           setSelectedKey(key)
                         }}
                       >
@@ -910,6 +909,9 @@ export function RacesInProgressPage() {
             </div>
           )}
         </section>
+      ) : null}
+      {!timingQuery.isLoading && !timingQuery.error && classNames.length > 0 && selectedVisible.length === 0 ? (
+        <p className="panel">Select one or more classes to view timing.</p>
       ) : null}
     </div>
   )

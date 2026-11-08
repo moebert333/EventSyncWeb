@@ -437,11 +437,7 @@ export function RaceOrderPage() {
       <EventParticipantHeader
         eventId={context.eventId}
         eventName={context.eventName}
-        pageTitle={
-          <>
-            Race Order (your races in <span className="text-sky-400">Blue</span>)
-          </>
-        }
+        pageTitle="Race Order"
       />
 
       {racesQuery.isLoading ? <Skeleton rows={6} /> : null}

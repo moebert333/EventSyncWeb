@@ -29,12 +29,6 @@ const bannerLinkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'bg-[#f5c518]/20 text-[#f5c518]' : 'text-zinc-300 hover:bg-white/5'
   }`
 
-function linkMatchesPath(link: (typeof links)[number], pathname: string): boolean {
-  return link.end
-    ? pathname === link.to
-    : pathname === link.to || pathname.startsWith(`${link.to}/`)
-}
-
 export function Header() {
   const location = useLocation()
   const simulation = useSimulationOptional()
@@ -49,14 +43,8 @@ export function Header() {
   const measureRef = useRef<HTMLDivElement>(null)
   const rafFit = useRef<number | null>(null)
 
-  const currentLink = links.find((link) => linkMatchesPath(link, location.pathname)) ?? null
-  // When only one slot fits, prefer the current page over the first menu item.
-  const bannerLinks =
-    visibleCount <= 0
-      ? []
-      : visibleCount === 1
-        ? [currentLink ?? links[0]!]
-        : links.slice(0, visibleCount)
+  // Only show banner items when at least 2 fit; otherwise hamburger-only.
+  const bannerLinks = visibleCount >= 2 ? links.slice(0, visibleCount) : []
   const overflowLinks = links.filter((link) => !bannerLinks.some((shown) => shown.to === link.to))
   const needsHamburger = overflowLinks.length > 0
 
@@ -107,17 +95,8 @@ export function Header() {
       // scrollbar / subpixel thrash that oscillates hamburger on/off.
       const reserved = Math.max(0, spaceAfterBrand - SECTION_GAP_PX - HAMBURGER_WIDTH_PX)
       const fitting = countFitting(reserved)
-      let next: number
-      if (fitting >= links.length) {
-        next = links.length
-      } else if (fitting <= 1) {
-        // At most one banner slot: ensure the current page label itself fits.
-        const currentIdx = links.findIndex((link) => linkMatchesPath(link, location.pathname))
-        const soloWidth = itemWidths[currentIdx >= 0 ? currentIdx : 0]!
-        next = soloWidth <= reserved + 0.5 ? 1 : 0
-      } else {
-        next = fitting
-      }
+      // Require at least 2 banner items; a single lone link is confusing.
+      const next = fitting >= links.length ? links.length : fitting >= 2 ? fitting : 0
       setVisibleCount((prev) => (prev === next ? prev : next))
     }
 

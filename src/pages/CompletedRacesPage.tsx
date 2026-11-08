@@ -328,7 +328,7 @@ export function CompletedRacesPage() {
       <EventParticipantHeader
         eventId={context.eventId}
         eventName={context.eventName}
-        pageTitle="Completed Race Results"
+        pageTitle="Event Results"
         onParticipantChanged={() => {
           const saved = loadResultsSelection()
           // Selecting a participant in the picker also updates Results selection.

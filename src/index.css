@@ -91,11 +91,17 @@ a {
   border: 1px solid rgb(255 255 255 / 0.08);
 }
 
-/* Active Race: tall enough for sticky header + 25 body rows before inner scroll. */
+/* Active Race: full table height (page scrolls vertically); horizontal scroll only. */
 .table-wrap-live {
-  max-height: calc(
-    (0.7rem * 2 + 0.75rem * 1.2) + 25 * (0.65rem * 2 + 0.92rem * 1.2 + 1px)
-  );
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+/* Keep columns from compressing so horizontal scroll appears when needed. */
+.table-wrap-live table.data {
+  width: max-content;
+  min-width: 100%;
 }
 
 table.data {
