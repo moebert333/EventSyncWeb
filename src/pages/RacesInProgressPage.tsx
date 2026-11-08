@@ -25,6 +25,9 @@ import type { ActiveRaceTiming, RaceStatus } from '../types/database'
 /** Typical mobile long-press (Material / iOS context-menu range). */
 const HIDE_MEDIA_LONG_PRESS_MS = 500
 const HIDE_MEDIA_MOVE_CANCEL_PX = 12
+/** Long-press a class chip to add it without clearing other selected classes. */
+const CLASS_LONG_PRESS_MS = 500
+const CLASS_LONG_PRESS_MOVE_CANCEL_PX = 12
 
 type HighlightMode = 'firstPlace' | 'bestLap' | 'participant'
 
@@ -299,6 +302,9 @@ export function RacesInProgressPage() {
   const appliedParticipantRaceRef = useRef<number | null>(null)
   const hideLongPressTimer = useRef<number | null>(null)
   const hideLongPressOrigin = useRef<{ x: number; y: number } | null>(null)
+  const classLongPressTimer = useRef<number | null>(null)
+  const classLongPressOrigin = useRef<{ x: number; y: number } | null>(null)
+  const suppressClassClick = useRef(false)
 
   function clearHideLongPress() {
     if (hideLongPressTimer.current != null) {
@@ -306,6 +312,14 @@ export function RacesInProgressPage() {
       hideLongPressTimer.current = null
     }
     hideLongPressOrigin.current = null
+  }
+
+  function clearClassLongPress() {
+    if (classLongPressTimer.current != null) {
+      window.clearTimeout(classLongPressTimer.current)
+      classLongPressTimer.current = null
+    }
+    classLongPressOrigin.current = null
   }
 
   function clearTextSelection() {
@@ -581,17 +595,58 @@ export function RacesInProgressPage() {
     )
   }
 
-  function toggleClass(name: string) {
-    const current = classNames.filter((n) => liveSelectedClasses.includes(n))
-    const next = current.includes(name)
-      ? current.filter((n) => n !== name)
-      : classNames.filter((n) => current.includes(n) || n === name)
+  function applyClassSelection(next: string[]) {
     rememberedSelectedClasses = next
     setSelectedClasses(next)
     if (next.length !== 1) {
       setSort(DEFAULT_SORT)
     } else if (sort.column === 'class') {
       setSort(PLACE_SORT)
+    }
+  }
+
+  /** Normal press: show only this class. */
+  function selectOnlyClass(name: string) {
+    applyClassSelection([name])
+  }
+
+  /** Long-press / Shift+click: add this class alongside any already selected. */
+  function addClass(name: string) {
+    const selected = rememberedSelectedClasses ?? liveSelectedClasses
+    const current = classNames.filter((n) => selected.includes(n))
+    if (current.includes(name)) return
+    applyClassSelection(classNames.filter((n) => current.includes(n) || n === name))
+  }
+
+  function classChipPointerHandlers(name: string) {
+    return {
+      onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => {
+        if (event.button !== 0 || event.shiftKey) return
+        clearClassLongPress()
+        classLongPressOrigin.current = { x: event.clientX, y: event.clientY }
+        classLongPressTimer.current = window.setTimeout(() => {
+          classLongPressTimer.current = null
+          classLongPressOrigin.current = null
+          suppressClassClick.current = true
+          addClass(name)
+        }, CLASS_LONG_PRESS_MS)
+      },
+      onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => {
+        const origin = classLongPressOrigin.current
+        if (origin == null) return
+        if (
+          Math.hypot(event.clientX - origin.x, event.clientY - origin.y) >
+          CLASS_LONG_PRESS_MOVE_CANCEL_PX
+        ) {
+          clearClassLongPress()
+        }
+      },
+      onPointerUp: clearClassLongPress,
+      onPointerLeave: clearClassLongPress,
+      onPointerCancel: clearClassLongPress,
+      onContextMenu: (event: { preventDefault: () => void }) => {
+        event.preventDefault()
+      },
     }
   }
   const highlighted = highlightRow(visibleRows, highlightMode, selectedParticipant?.participantId ?? null)
@@ -776,11 +831,22 @@ export function RacesInProgressPage() {
                     key={name}
                     type="button"
                     aria-pressed={selected}
-                    title={selected ? `Hide ${name} timing` : `Show ${name} timing`}
-                    className={`min-h-8 cursor-pointer border px-2 py-0.5 text-xs font-semibold uppercase leading-tight ${
+                    title={`${name}: click to show only this class; Shift+click or long-press to add`}
+                    className={`min-h-8 cursor-pointer touch-manipulation select-none border px-2 py-0.5 text-xs font-semibold uppercase leading-tight ${
                       selected ? 'border-[#f5c518] bg-[#f5c518] text-black' : 'border-white/20 bg-transparent text-white'
                     }`}
-                    onClick={() => toggleClass(name)}
+                    onClick={(event) => {
+                      if (suppressClassClick.current) {
+                        suppressClassClick.current = false
+                        return
+                      }
+                      if (event.shiftKey) {
+                        addClass(name)
+                        return
+                      }
+                      selectOnlyClass(name)
+                    }}
+                    {...classChipPointerHandlers(name)}
                   >
                     {name}
                   </button>
