@@ -151,7 +151,7 @@ Allow `SELECT` on:
 
 - `organizations`, `series`, `events`, `event_codes`
 - `races`, `classes`, `race_class`, `status`
-- `participants`, `event_entry`, `event_results`
+- `participants`, `event_entry`, `event_results`, `event_points`
 - `active_timing`, `race_timing`
 - views listed above
 
@@ -228,6 +228,14 @@ order by class_name, overall_place;
 ```
 
 `overall_place` is text (`DNS/DNF` possible); sort using underlying `overall_position` if needed by selecting from `event_results` instead of the view.
+
+When a class has no scored Place and all Points are 0/null, the client also reads the event’s points table (display-only enrichment; see UI spec):
+
+```sql
+select position, points
+from public.event_points
+where event_id = $event_id;
+```
 
 ## Types
 

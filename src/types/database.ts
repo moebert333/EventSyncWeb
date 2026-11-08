@@ -127,6 +127,12 @@ export type EventClassResult = {
   finals_place: string | null
 }
 
+export type EventPointsRow = {
+  event_id: number
+  position: number
+  points: number
+}
+
 export type ClassRow = {
   class_id: number
   class_name: string

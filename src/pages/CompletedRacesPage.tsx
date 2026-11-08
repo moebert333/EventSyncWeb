@@ -14,6 +14,7 @@ import {
   type ResultsFilter,
 } from '../hooks/useEventResults'
 import { formatEventDate, riderName } from '../lib/format'
+import { motoKeysUpTo } from '../lib/resultsPoints'
 import {
   clearResultsSelection,
   loadResultsSelection,
@@ -40,13 +41,22 @@ function cell(value: string | number | null): string {
   return String(value)
 }
 
-function optionalColumnsFor(rows: EventClassResult[]) {
-  return OPTIONAL_COLUMNS.filter((column) =>
-    rows.some((row) => {
+function optionalColumnsFor(rows: EventClassResult[], maxMoto: number | null) {
+  const forcedMoto = new Set<keyof EventClassResult>(
+    maxMoto != null && maxMoto >= 1 ? motoKeysUpTo(maxMoto) : [],
+  )
+  const showPoints =
+    rows.length > 0 &&
+    rows.every((row) => row.overall_points == null || row.overall_points === 0)
+
+  return OPTIONAL_COLUMNS.filter((column) => {
+    if (forcedMoto.has(column.key)) return true
+    if (column.key === 'overall_points' && showPoints) return true
+    return rows.some((row) => {
       const value = row[column.key]
       return value != null && value !== ''
-    }),
-  )
+    })
+  })
 }
 
 function groupResultsByClass(rows: EventClassResult[]): { className: string; rows: EventClassResult[] }[] {
@@ -272,7 +282,8 @@ export function CompletedRacesPage() {
     })
   }
 
-  const rows = resultsQuery.data ?? []
+  const rows = resultsQuery.data?.rows ?? []
+  const maxMotoByClass = resultsQuery.data?.maxMotoByClass ?? {}
   const classGroups = groupResultsByClass(rows)
   const collapsibleClasses = classGroups.length > 1
   const loading = seriesQuery.isLoading || eventsQuery.isLoading
@@ -585,7 +596,9 @@ export function CompletedRacesPage() {
       {classGroups.length > 0 ? (
         <div className="space-y-6">
           {classGroups.map((group) => {
-            const optional = optionalColumnsFor(group.rows)
+            const classId = group.rows[0]?.class_id
+            const maxMoto = classId != null ? (maxMotoByClass[classId] ?? null) : null
+            const optional = optionalColumnsFor(group.rows, maxMoto)
             const expanded = !collapsedClasses.has(group.className)
             return (
               <div key={group.className} className="space-y-2">

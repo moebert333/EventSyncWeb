@@ -119,6 +119,12 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] Selected participant row in class results is highlighted light grey when present
 - [ ] Changing the Participant dropdown updates the Selected participant
 - [ ] Rows from `event_class_results`
+- [ ] When a class already has any Place greater than 0, Place/Points are left as returned
+- [ ] When a class has no scored Place and all Points are 0/null, Place is derived from motos up to Race Order max moto (or Final alone)
+- [ ] Max moto per class comes from the largest `MOTO n` in `session_name` on Race Order races for that class
+- [ ] Points from `event_points` gated by `VITE_REQUIRE_ALL_MOTOS` (default false): false → Points after any one moto 1…max is numerically scored; true → only when every moto 1…max is scored (else Place with Points 0). DNS/DNF does not count as scored for that gate
+- [ ] When no Points are scored yet, Points column still shows with 0 per row; Moto 1…max columns always show when max moto is known, with — for unscored cells
+- [ ] Non-numeric moto/final values count as 80 for Place; riders with no numeric scoring values get 0 Points when Points are assigned; missing `event_points` rows map to 0
 - [ ] Empty and error states handled
 - [ ] Switching event inside the same org does not require a new code
 

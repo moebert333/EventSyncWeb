@@ -1,7 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatRaceTitle, placeRank } from '../lib/format'
+import { enrichEventResults, maxMotoByClassId } from '../lib/resultsPoints'
 import { supabase } from '../lib/supabase'
-import type { ClassRow, EntryParticipant, EventClassResult, EventRow, Series } from '../types/database'
+import type {
+  ClassRow,
+  EntryParticipant,
+  EventClassResult,
+  EventPointsRow,
+  EventRow,
+  Series,
+} from '../types/database'
 
 export type ResultsFilter = {
   eventId: number
@@ -15,6 +23,20 @@ export type EventRaceOption = {
   race_num: number
   race_name: string | null
   is_practice: boolean
+}
+
+export type EventResultsData = {
+  rows: EventClassResult[]
+  /** Largest scheduled MOTO n per class_id from Race Order sessions. */
+  maxMotoByClass: Record<number, number>
+}
+
+function toMaxMotoRecord(map: Map<number, number>): Record<number, number> {
+  const record: Record<number, number> = {}
+  for (const [classId, maxMoto] of map.entries()) {
+    record[classId] = maxMoto
+  }
+  return record
 }
 
 export function raceOptionLabel(race: EventRaceOption): string {
@@ -118,8 +140,9 @@ export function useEventResults(filter: ResultsFilter | null) {
   return useQuery({
     queryKey: ['event-results', filter],
     enabled: filter != null,
-    queryFn: async (): Promise<EventClassResult[]> => {
-      let query = supabase.from('event_class_results').select(RESULT_COLUMNS).eq('event_id', filter!.eventId)
+    queryFn: async (): Promise<EventResultsData> => {
+      const eventId = filter!.eventId
+      let query = supabase.from('event_class_results').select(RESULT_COLUMNS).eq('event_id', eventId)
       if (filter!.className) {
         query = query.eq('class_name', filter!.className)
       } else if (filter!.participantId != null) {
@@ -128,12 +151,12 @@ export function useEventResults(filter: ResultsFilter | null) {
           supabase
             .from('event_entry')
             .select('class_id')
-            .eq('event_id', filter!.eventId)
+            .eq('event_id', eventId)
             .eq('participant_id', filter!.participantId),
           supabase
             .from('event_class_results')
             .select('class_id')
-            .eq('event_id', filter!.eventId)
+            .eq('event_id', eventId)
             .eq('participant_id', filter!.participantId),
         ])
         if (entryResult.error) throw entryResult.error
@@ -146,7 +169,7 @@ export function useEventResults(filter: ResultsFilter | null) {
             ].map((row) => row.class_id),
           ),
         ]
-        if (classIds.length === 0) return []
+        if (classIds.length === 0) return { rows: [], maxMotoByClass: {} }
         query = query.in('class_id', classIds)
       } else if (filter!.raceId != null) {
         const { data: raceClasses, error: raceClassError } = await supabase
@@ -157,19 +180,59 @@ export function useEventResults(filter: ResultsFilter | null) {
         const classIds = [
           ...new Set(((raceClasses ?? []) as { class_id: number }[]).map((row) => row.class_id)),
         ]
-        if (classIds.length === 0) return []
+        if (classIds.length === 0) return { rows: [], maxMotoByClass: {} }
         query = query.in('class_id', classIds)
       }
-      const { data, error } = await query
-      if (error) throw error
-      const rows = (data ?? []) as EventClassResult[]
+
+      const [resultsResponse, pointsResponse, racesResponse] = await Promise.all([
+        query,
+        supabase.from('event_points').select('event_id, position, points').eq('event_id', eventId),
+        supabase.from('races').select('race_id, session_name').eq('event_id', eventId),
+      ])
+      if (resultsResponse.error) throw resultsResponse.error
+      if (pointsResponse.error) throw pointsResponse.error
+      if (racesResponse.error) throw racesResponse.error
+
+      const raceRows = (racesResponse.data ?? []) as { race_id: number; session_name: string | null }[]
+      let maxMotoByClass = new Map<number, number>()
+      if (raceRows.length > 0) {
+        const raceIds = raceRows.map((race) => race.race_id)
+        const { data: raceClasses, error: raceClassError } = await supabase
+          .from('race_class_names')
+          .select('race_id, class_id')
+          .in('race_id', raceIds)
+        if (raceClassError) throw raceClassError
+        const classIdsByRace = new Map<number, number[]>()
+        for (const row of (raceClasses ?? []) as { race_id: number; class_id: number }[]) {
+          const list = classIdsByRace.get(row.race_id) ?? []
+          list.push(row.class_id)
+          classIdsByRace.set(row.race_id, list)
+        }
+        maxMotoByClass = maxMotoByClassId(
+          raceRows.map((race) => ({
+            session_name: race.session_name,
+            class_ids: classIdsByRace.get(race.race_id) ?? [],
+          })),
+        )
+      }
+
+      const pointsByPosition = new Map<number, number>()
+      for (const row of (pointsResponse.data ?? []) as EventPointsRow[]) {
+        pointsByPosition.set(row.position, row.points)
+      }
+
+      const rows = enrichEventResults(
+        (resultsResponse.data ?? []) as EventClassResult[],
+        pointsByPosition,
+        maxMotoByClass,
+      )
       rows.sort(
         (a, b) =>
           a.class_name.localeCompare(b.class_name) ||
           placeRank(a.overall_place) - placeRank(b.overall_place) ||
           a.last_name.localeCompare(b.last_name),
       )
-      return rows
+      return { rows, maxMotoByClass: toMaxMotoRecord(maxMotoByClass) }
     },
   })
 }
