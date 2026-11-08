@@ -38,18 +38,16 @@ export function StagingAlert() {
       : null
   const activeRace = racesQuery.data?.find((race) => race.active)
   const activeRaceId = activeRace?.race_id ?? null
-  const activeRaceStatus = urgent === 0 ? (activeRace?.status ?? null) : null
   const label =
-    urgent != null
-      ? stagingLabelText(urgent, activeRaceStatus, activeRace?.is_practice ?? false)
-      : null
+    urgent != null ? stagingLabelText(urgent, activeRace?.is_practice ?? false) : null
   // Include active race so a new race re-opens even when the message text matches.
   const alertKey =
     urgent != null && label != null && activeRaceId != null
       ? `${activeRaceId}:${urgent}:${label}`
       : null
   const open = alertKey != null && dismissedFor !== alertKey
-  const flash = urgent === 0 || urgent === 1 || urgent === 'inThisRace'
+  // Flash only when in Staging (0) or in Active/Paused ('inThisRace'). 1–2 away is solid yellow.
+  const flash = urgent === 0 || urgent === 'inThisRace'
 
   useEffect(() => {
     if (alertKey == null) {

@@ -182,19 +182,45 @@ function participantSessionNums(
     .sort((a, b) => a - b)
 }
 
+export type WarningDetailStyle = 'none' | 'yellow' | 'yellowFlash'
+
 export type RaceProgressLine =
   | { kind: 'first'; raceNum: number; isPractice: boolean }
-  | { kind: 'active'; activeNum: number; nextNum: number; isPractice: boolean }
-  /** In the active session while Staging (no following-session clause). */
-  | { kind: 'inThisRace'; activeNum: number; nextNum?: undefined; isPractice: boolean }
-  /** In the active session while Active / Paused / Finished, with following session. */
-  | { kind: 'inThisRaceWithNext'; activeNum: number; nextNum: number; isPractice: boolean }
+  /** Not in the active session; next session still ahead. */
+  | {
+      kind: 'active'
+      activeNum: number
+      nextNum: number
+      /** Event race_num gap: nextNum - activeNum. */
+      racesAway: number
+      isPractice: boolean
+    }
+  /** In the active session with no later session in the pool. */
+  | {
+      kind: 'inThisRace'
+      activeNum: number
+      nextNum?: undefined
+      isPractice: boolean
+      status: RaceStatus
+    }
+  /** In the active session with a later session still ahead. */
+  | {
+      kind: 'inThisRaceWithNext'
+      activeNum: number
+      nextNum: number
+      isPractice: boolean
+      status: RaceStatus
+    }
   /** Rider has no remaining sessions in the current practice/race pool. */
   | { kind: 'completed'; isPractice: boolean }
 
 /** True when the active race has started or finished (not still Staging). */
 function activeRacePastStaging(status: RaceStatus | null | undefined): boolean {
   return status === 'Active' || status === 'Paused' || status === 'Finished'
+}
+
+function isLiveInRaceStatus(status: RaceStatus | null | undefined): boolean {
+  return status === 'Active' || status === 'Paused'
 }
 
 function sessionWord(isPractice: boolean, capitalize: boolean): string {
@@ -249,39 +275,57 @@ export function titleCaseProgressLine(text: string): string {
 }
 
 /**
- * Active + next participant session, or first session when nothing is active.
+ * Active + next participant session, or first competitive race when nothing is active.
  * When a practice is active, counts practices only; when a normal race is active, races only.
- * When nothing is active, defaults to competitive races.
+ * When nothing is active, always uses competitive races (never Practice) for the Title Box.
  */
 export function raceProgressLine(
   races: EventRaceOrderRow[],
   participantRaceIds: number[],
 ): RaceProgressLine | null {
   const activeRace = races.find((race) => race.active) ?? null
-  const isPractice = activeRace?.is_practice ?? false
+  if (!activeRace) {
+    // Rule 1: first competitive Race only (not Practice). Blank if rider has none.
+    const racePool = sessionPool(races, false)
+    const sortedRaces = participantSessionNums(racePool, participantRaceIds)
+    if (sortedRaces.length === 0) return null
+    return { kind: 'first', raceNum: sortedRaces[0]!, isPractice: false }
+  }
+
+  const isPractice = activeRace.is_practice
   const pool = sessionPool(races, isPractice)
   const sorted = participantSessionNums(pool, participantRaceIds)
   if (sorted.length === 0) return null
-  if (!activeRace) {
-    return { kind: 'first', raceNum: sorted[0]!, isPractice }
-  }
 
+  const status = activeRace.status ?? 'Staging'
   const inActiveRace = participantRaceIds.includes(activeRace.race_id)
-  // In the active session (Staging or on track): still surface next vs last for the header.
+  // In the active session (Staging / Active / Paused / Finished): next vs last for the header.
   if (
     inActiveRace &&
-    (activeRace.status === 'Staging' || activeRacePastStaging(activeRace.status))
+    (status === 'Staging' || activeRacePastStaging(status))
   ) {
     const nextNum = sorted.find((num) => num > activeRace.race_num)
     if (nextNum == null) {
-      return { kind: 'inThisRace', activeNum: activeRace.race_num, isPractice }
+      return { kind: 'inThisRace', activeNum: activeRace.race_num, isPractice, status }
     }
-    return { kind: 'inThisRaceWithNext', activeNum: activeRace.race_num, nextNum, isPractice }
+    return {
+      kind: 'inThisRaceWithNext',
+      activeNum: activeRace.race_num,
+      nextNum,
+      isPractice,
+      status,
+    }
   }
 
   const nextNum = sorted.find((num) => num >= activeRace.race_num)
   if (nextNum == null) return { kind: 'completed', isPractice }
-  return { kind: 'active', activeNum: activeRace.race_num, nextNum, isPractice }
+  return {
+    kind: 'active',
+    activeNum: activeRace.race_num,
+    nextNum,
+    racesAway: nextNum - activeRace.race_num,
+    isPractice,
+  }
 }
 
 function noMoreSessionsDetail(isPractice: boolean): string {
@@ -289,36 +333,58 @@ function noMoreSessionsDetail(isPractice: boolean): string {
   return titleCaseProgressLine(`You have no more ${Units}`)
 }
 
+function nextSessionDetail(isPractice: boolean, nextNum: number): string {
+  const unit = sessionWord(isPractice, false)
+  return titleCaseProgressLine(`Your next ${unit} is ${nextNum}`)
+}
+
+function inThisSessionDetail(isPractice: boolean): string {
+  const Unit = sessionWord(isPractice, true)
+  return titleCaseProgressLine(`You are in this ${Unit}`)
+}
+
 /** Title like "Active Race 1" plus the remaining status detail for the header strip. */
 export function raceProgressParts(line: RaceProgressLine): {
   title: string | null
   detail: string
+  detailStyle: WarningDetailStyle
 } {
   const unit = sessionWord(line.isPractice, false)
   const Unit = sessionWord(line.isPractice, true)
   if (line.kind === 'first') {
     return {
       title: null,
-      detail: titleCaseProgressLine(`Your first ${unit} is ${line.raceNum}.`),
+      // Rule 1 always uses Race (isPractice forced false above).
+      detail: titleCaseProgressLine(`Your first ${unit} is ${line.raceNum}`),
+      detailStyle: 'none',
     }
   }
   if (line.kind === 'completed') {
-    return { title: null, detail: noMoreSessionsDetail(line.isPractice) }
+    return { title: null, detail: noMoreSessionsDetail(line.isPractice), detailStyle: 'none' }
   }
   const title = `Active ${Unit} ${line.activeNum}`
-  // Header strip: next/last race — not "You are in this Race" (that stays on the popup).
   if (line.kind === 'inThisRace') {
-    return { title, detail: noMoreSessionsDetail(line.isPractice) }
+    // 4a Staging + no more → "You are in this Race" yellow flash.
+    // 4b/4c Active/Paused/Finished + no more → "You Have No More Races".
+    if (line.status === 'Staging') {
+      return { title, detail: inThisSessionDetail(line.isPractice), detailStyle: 'yellowFlash' }
+    }
+    return { title, detail: noMoreSessionsDetail(line.isPractice), detailStyle: 'none' }
   }
   if (line.kind === 'inThisRaceWithNext') {
     return {
       title,
-      detail: titleCaseProgressLine(`Your next ${unit} is ${line.nextNum}`),
+      detail: nextSessionDetail(line.isPractice, line.nextNum),
+      detailStyle: 'none',
     }
   }
+  // Not in current race: yellow (not flashing) when 1–2 race_num away.
+  const detailStyle: WarningDetailStyle =
+    line.racesAway === 1 || line.racesAway === 2 ? 'yellow' : 'none'
   return {
     title,
-    detail: titleCaseProgressLine(`Your next ${unit} is ${line.nextNum}`),
+    detail: nextSessionDetail(line.isPractice, line.nextNum),
+    detailStyle,
   }
 }
 
@@ -328,6 +394,10 @@ export function raceProgressMessage(line: RaceProgressLine): string {
   // Race Order popup still leads with "You are in this Race" when applicable.
   if (line.kind === 'inThisRace' || line.kind === 'inThisRaceWithNext') {
     const inThis = titleCaseProgressLine(`You are in this ${Unit}!`)
+    if (line.kind === 'inThisRace' && line.status === 'Staging') {
+      // Detail is the same phrase without "!"; avoid duplicating.
+      return parts.title == null ? inThis : `${parts.title}, ${inThis}`
+    }
     if (parts.title == null) return `${inThis} ${parts.detail}`
     return `${parts.title}, ${inThis} ${parts.detail}`
   }
@@ -338,11 +408,12 @@ export function raceProgressMessage(line: RaceProgressLine): string {
 export type StagingInResult = number | 'completed' | 'inThisRace' | null
 
 /**
- * Sessions from the current active race/practice up to the participant's next one (by race_num).
+ * Popup urgency from the current active race/practice up to the participant's next one (by race_num).
  * Scoped to practices when the active session is a practice; otherwise competitive races.
- * When the participant is in the active session and it is Staging → 0 ("Your Race/Practice is Staging").
- * When that session is Active / Paused / Finished → `'inThisRace'` ("You are in this Race/Practice").
- * Returns `null` when the label should be hidden, `'completed'` when the rider has no sessions left in that pool.
+ * - In active Staging → 0 ("Your Race/Practice is Staging")
+ * - In active Active/Paused → `'inThisRace'` ("You are in this Race/Practice")
+ * - In active Finished, or not in active: race_num gap to next (1|2 → Staging popup; >2 → hidden)
+ * Returns `null` when the popup should be hidden, `'completed'` when the rider has no sessions left.
  */
 export function stagingInRaces(
   races: EventRaceOrderRow[],
@@ -362,29 +433,36 @@ export function stagingInRaces(
   const inActiveRace = participantRaceIds.includes(activeRace.race_id)
 
   if (inActiveRace && activeRace.status === 'Staging') return 0
-  if (inActiveRace && activeRacePastStaging(activeRace.status)) return 'inThisRace'
+  // Finished does not keep the "in this race" popup; fall through for 1–2-away Staging popup.
+  if (inActiveRace && isLiveInRaceStatus(activeRace.status)) return 'inThisRace'
 
-  const nextNum = sorted.find((num) => num >= activeRace.race_num)
+  const nextNum = sorted.find((num) =>
+    inActiveRace ? num > activeRace.race_num : num >= activeRace.race_num,
+  )
   if (nextNum == null) return 'completed'
   return Math.max(0, nextNum - activeRace.race_num)
 }
 
+/**
+ * Warning Popup copy. All strings are title-cased.
+ * Only 0 / 1 / 2 / 'inThisRace' are shown as a popup (see StagingAlert).
+ */
 export function stagingLabelText(
   stagingIn: StagingInResult,
-  raceStatus?: RaceStatus | null,
   isPractice = false,
 ): string | null {
   const Unit = sessionWord(isPractice, true)
-  const units = isPractice ? 'practices' : 'races'
-  const Units = isPractice ? 'Practices' : 'Races'
-  if (stagingIn === 'completed') return `Your ${units} are completed`
-  if (stagingIn === 'inThisRace') return `You are in this ${Unit}`
+  if (stagingIn === 'completed') return null
+  if (stagingIn === 'inThisRace') {
+    return titleCaseProgressLine(`You are in this ${Unit}`)
+  }
   if (stagingIn === 0) {
     // Participant is in the Staging active session.
-    if (raceStatus === 'Staging' || raceStatus == null) return `Your next ${Unit} is Staging`
-    return `Your next ${sessionWord(isPractice, false)} is ${raceStatus}`
+    return titleCaseProgressLine(`Your ${Unit} is Staging`)
   }
-  if (stagingIn === 1 || stagingIn === 2) return `Your next ${Unit} is Staging`
-  if (stagingIn != null) return `Staging in: ${stagingIn - 2} ${Units}`
+  if (stagingIn === 1 || stagingIn === 2) {
+    return titleCaseProgressLine(`Your next ${Unit} is Staging`)
+  }
+  // >2 away: no popup (legacy "Staging in: N" removed).
   return null
 }

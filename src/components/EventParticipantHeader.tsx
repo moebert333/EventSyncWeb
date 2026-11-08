@@ -16,7 +16,7 @@ const STICKY_TOP = 'top-[calc(3.75rem+env(safe-area-inset-top,0px))]'
 type EventParticipantHeaderProps = {
   eventId: number
   eventName: string
-  /** Current page name shown at the top of the strip. */
+  /** Current page name shown on the second line of the strip. */
   pageTitle: ReactNode
   /** When false, stays in document flow (e.g. Active Race split layout). Default true. */
   sticky?: boolean
@@ -48,6 +48,13 @@ export function EventParticipantHeader({
       : null
   const progressParts = progressLine ? raceProgressParts(progressLine) : null
   const statusDetail = progressParts?.detail ?? null
+  const detailStyle = progressParts?.detailStyle ?? 'none'
+  const detailClass =
+    detailStyle === 'yellowFlash'
+      ? 'staging-flash shrink-0 px-2 py-0.5 text-right text-lg font-semibold leading-tight !text-black underline underline-offset-2'
+      : detailStyle === 'yellow'
+        ? 'shrink-0 bg-yellow-300 px-2 py-0.5 text-right text-lg font-semibold leading-tight !text-black underline underline-offset-2'
+        : 'shrink-0 text-right text-lg font-semibold leading-tight !text-[#f0d56a] underline underline-offset-2'
 
   const participantLabel = selectedForEvent
     ? `${riderName(selectedForEvent.firstName, selectedForEvent.lastName)}${
@@ -67,7 +74,9 @@ export function EventParticipantHeader({
     >
       <div className="space-y-1">
         <div className="flex min-h-[1.75rem] flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <p className="shrink-0 text-xl font-bold leading-tight text-green-500">{pageTitle}</p>
+          <p className="min-w-0 text-lg font-bold leading-tight">
+            <span className="text-zinc-400">Event:</span> <span className="text-white">{eventName}</span>
+          </p>
           <span className="shrink-0 text-right text-lg font-bold leading-tight">
             <span className="text-zinc-400">Rider:</span>{' '}
             <button
@@ -81,14 +90,13 @@ export function EventParticipantHeader({
           </span>
         </div>
         <p className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-lg font-bold leading-tight">
-          <span className="min-w-0">
-            <span className="text-zinc-400">Event:</span> <span className="text-white">{eventName}</span>
-          </span>
+          <span className="shrink-0 text-xl font-bold leading-tight text-green-500">{pageTitle}</span>
           {statusDetail ? (
             <Link
               to="/order"
               state={{ skipProgressPopup: true }}
-              className="shrink-0 text-right text-lg font-semibold leading-tight !text-[#f0d56a] underline underline-offset-2"
+              className={detailClass}
+              style={detailStyle !== 'none' ? { color: '#000' } : undefined}
               title="Go to Race Order"
             >
               {statusDetail}

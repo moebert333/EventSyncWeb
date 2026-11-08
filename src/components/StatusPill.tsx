@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 export const statusToneClass: Record<string, string> = {
   Waiting: 'bg-zinc-300 text-black',
-  Staging: 'bg-orange-300 text-black',
+  Staging: 'bg-orange-200 text-black',
   Active: 'bg-green-500 text-black',
   Paused: 'bg-yellow-300 text-black',
   Finished: 'bg-sky-300 text-black',
