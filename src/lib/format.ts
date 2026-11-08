@@ -84,6 +84,44 @@ export function formatRaceNumberLabel(
 }
 
 /**
+ * Sticky/live header title on Active Race.
+ * Practice: "Practice 4" (race_num). Competitive: "Active Race 12".
+ */
+export function formatActiveSessionTitle(
+  raceNum: number,
+  isPractice: boolean | null | undefined,
+): string {
+  return isPractice ? `Practice ${raceNum}` : `Active Race ${raceNum}`
+}
+
+/** Simple word title case for session headings (keeps digits as-is). */
+function toTitleCaseWords(text: string): string {
+  return text.replace(/\b([A-Za-z][A-Za-z']*)\b/g, (word) => {
+    const lower = word.toLowerCase()
+    return lower.charAt(0).toUpperCase() + lower.slice(1)
+  })
+}
+
+/**
+ * Active Race session heading under the title strip.
+ * Practice: "PRACTICE SESSION 4" → "Practice Session" (drop trailing number).
+ * Race: "MOTO 2" → "Moto 2" (keep number).
+ */
+export function formatLiveSessionLabel(
+  session: string | null | undefined,
+  isPractice: boolean | null | undefined,
+): string | null {
+  const raw = formatSessionName(session, true)
+  if (!raw) return null
+  let label = raw
+  if (isPractice) {
+    label = label.replace(/\s+\d+\s*$/, '').trim()
+  }
+  if (!label) return null
+  return toTitleCaseWords(label)
+}
+
+/**
  * Number label, optionally with race_name when it differs.
  * Practice sessions never append race_name.
  */

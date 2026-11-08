@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useEventCode } from '../hooks/useEventCode'
 import {
   raceProgressLine,
@@ -32,10 +32,7 @@ export function EventParticipantHeader({
   onParticipantChanged,
 }: EventParticipantHeaderProps) {
   const { selectedParticipant } = useEventCode()
-  const location = useLocation()
   const [picking, setPicking] = useState(false)
-  const onLivePage =
-    location.pathname === '/live' || location.pathname.startsWith('/live/')
 
   const selectedForEvent =
     selectedParticipant?.eventId === eventId ? selectedParticipant : null
@@ -50,10 +47,7 @@ export function EventParticipantHeader({
       ? raceProgressLine(racesQuery.data, participantRacesQuery.data)
       : null
   const progressParts = progressLine ? raceProgressParts(progressLine) : null
-  // "Active Race N" progress title is only for the live page; other pages use pageTitle.
-  const titleLabel = onLivePage && progressParts?.title ? progressParts.title : pageTitle
   const statusDetail = progressParts?.detail ?? null
-  const titleLinksToLive = onLivePage && progressParts?.title != null
 
   const participantLabel = selectedForEvent
     ? `${riderName(selectedForEvent.firstName, selectedForEvent.lastName)}${
@@ -73,17 +67,7 @@ export function EventParticipantHeader({
     >
       <div className="space-y-1">
         <div className="flex min-h-[1.75rem] flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          {titleLinksToLive ? (
-            <Link
-              to="/live"
-              className="shrink-0 text-xl font-bold leading-tight !text-green-500 no-underline"
-              title="Go to Active Race"
-            >
-              {titleLabel}
-            </Link>
-          ) : (
-            <p className="shrink-0 text-xl font-bold leading-tight text-green-500">{titleLabel}</p>
-          )}
+          <p className="shrink-0 text-xl font-bold leading-tight text-green-500">{pageTitle}</p>
           <span className="shrink-0 text-right text-lg font-bold leading-tight">
             <span className="text-zinc-400">Rider:</span>{' '}
             <button

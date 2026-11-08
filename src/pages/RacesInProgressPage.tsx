@@ -12,8 +12,9 @@ import { useSimulationOptional } from '../lib/simulationContext'
 import {
   bestLapLabel,
   formatRaceTime,
+  formatActiveSessionTitle,
+  formatLiveSessionLabel,
   formatRaceTitle,
-  formatSessionName,
   placeRank,
   raceTimeSeconds,
   riderName,
@@ -556,7 +557,7 @@ export function RacesInProgressPage() {
     )
   }
 
-  const sessionLabel = formatSessionName(race.session_name, true)
+  const sessionLabel = formatLiveSessionLabel(race.session_name, race.is_practice)
   const selectedVisible = classNames.filter((name) => liveSelectedClasses.includes(name))
   const showingMultiple = selectedVisible.length !== 1
   const visibleRows = timingRows
@@ -669,7 +670,7 @@ export function RacesInProgressPage() {
         <EventParticipantHeader
           eventId={context.eventId}
           eventName={race.event_name || context.eventName}
-          pageTitle={race.is_practice ? 'Active Practice' : 'Active Race'}
+          pageTitle={formatActiveSessionTitle(race.race_num, race.is_practice)}
           onParticipantChanged={() => {
             appliedParticipantRaceRef.current = null
           }}
@@ -677,7 +678,7 @@ export function RacesInProgressPage() {
       ) : null}
       <header className="!mt-1 border-b border-[#f5c518] pb-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-display text-3xl font-extrabold uppercase leading-tight">
+          <h1 className="text-xl font-bold leading-tight text-white">
             {sessionLabel ?? formatRaceTitle(race.race_num, race.is_practice, race.race_name)}
           </h1>
           <StatusPill status={race.status} />

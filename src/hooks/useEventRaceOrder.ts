@@ -189,6 +189,8 @@ export type RaceProgressLine =
   | { kind: 'inThisRace'; activeNum: number; nextNum?: undefined; isPractice: boolean }
   /** In the active session while Active / Paused / Finished, with following session. */
   | { kind: 'inThisRaceWithNext'; activeNum: number; nextNum: number; isPractice: boolean }
+  /** Rider has no remaining sessions in the current practice/race pool. */
+  | { kind: 'completed'; isPractice: boolean }
 
 /** True when the active race has started or finished (not still Staging). */
 function activeRacePastStaging(status: RaceStatus | null | undefined): boolean {
@@ -278,8 +280,13 @@ export function raceProgressLine(
   }
 
   const nextNum = sorted.find((num) => num >= activeRace.race_num)
-  if (nextNum == null) return null
+  if (nextNum == null) return { kind: 'completed', isPractice }
   return { kind: 'active', activeNum: activeRace.race_num, nextNum, isPractice }
+}
+
+function noMoreSessionsDetail(isPractice: boolean): string {
+  const Units = isPractice ? 'Practices' : 'Races'
+  return titleCaseProgressLine(`You have no more ${Units}`)
 }
 
 /** Title like "Active Race 1" plus the remaining status detail for the header strip. */
@@ -295,10 +302,13 @@ export function raceProgressParts(line: RaceProgressLine): {
       detail: titleCaseProgressLine(`Your first ${unit} is ${line.raceNum}.`),
     }
   }
+  if (line.kind === 'completed') {
+    return { title: null, detail: noMoreSessionsDetail(line.isPractice) }
+  }
   const title = `Active ${Unit} ${line.activeNum}`
   // Header strip: next/last race — not "You are in this Race" (that stays on the popup).
   if (line.kind === 'inThisRace') {
-    return { title, detail: titleCaseProgressLine(`This is your last ${unit}.`) }
+    return { title, detail: noMoreSessionsDetail(line.isPractice) }
   }
   if (line.kind === 'inThisRaceWithNext') {
     return {
