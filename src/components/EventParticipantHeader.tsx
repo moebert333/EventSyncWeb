@@ -72,7 +72,7 @@ export function EventParticipantHeader({
       className={`${sticky ? `sticky ${STICKY_TOP}` : 'relative'} z-20 -mx-4 -mt-6 border-b border-[#f5c518]/35 bg-[#252525] px-4 py-2 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]`}
     >
       <div className="space-y-1">
-        <div className="flex min-h-[1.75rem] items-center gap-x-3">
+        <div className="flex min-h-[1.75rem] flex-wrap items-center justify-between gap-x-3 gap-y-1">
           {titleLinksToLive ? (
             <Link
               to="/live"
@@ -84,22 +84,7 @@ export function EventParticipantHeader({
           ) : (
             <p className="shrink-0 text-xl font-bold leading-tight text-green-500">{titleLabel}</p>
           )}
-          {statusDetail ? (
-            <Link
-              to="/order"
-              state={{ skipProgressPopup: true }}
-              className="min-w-0 flex-1 text-right text-lg font-semibold leading-tight !text-[#f0d56a] underline underline-offset-2 sm:text-center"
-              title="Go to Race Order"
-            >
-              {statusDetail}
-            </Link>
-          ) : null}
-        </div>
-        <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-lg font-bold leading-tight">
-          <span>
-            <span className="text-zinc-400">Event:</span> <span className="text-white">{eventName}</span>
-          </span>
-          <span>
+          <span className="shrink-0 text-right text-lg font-bold leading-tight">
             <span className="text-zinc-400">Rider:</span>{' '}
             <button
               type="button"
@@ -110,6 +95,21 @@ export function EventParticipantHeader({
               {participantLabel}
             </button>
           </span>
+        </div>
+        <p className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-lg font-bold leading-tight">
+          <span className="min-w-0">
+            <span className="text-zinc-400">Event:</span> <span className="text-white">{eventName}</span>
+          </span>
+          {statusDetail ? (
+            <Link
+              to="/order"
+              state={{ skipProgressPopup: true }}
+              className="shrink-0 text-right text-lg font-semibold leading-tight !text-[#f0d56a] underline underline-offset-2"
+              title="Go to Race Order"
+            >
+              {statusDetail}
+            </Link>
+          ) : null}
         </p>
         {picking ? (
           <SelectParticipantBox eventId={eventId} onOk={finishPick} onSkip={finishPick} />

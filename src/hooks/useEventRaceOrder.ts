@@ -265,11 +265,11 @@ export function raceProgressLine(
   }
 
   const inActiveRace = participantRaceIds.includes(activeRace.race_id)
-  if (inActiveRace && activeRace.status === 'Staging') {
-    return { kind: 'inThisRace', activeNum: activeRace.race_num, isPractice }
-  }
-
-  if (inActiveRace && activeRacePastStaging(activeRace.status)) {
+  // In the active session (Staging or on track): still surface next vs last for the header.
+  if (
+    inActiveRace &&
+    (activeRace.status === 'Staging' || activeRacePastStaging(activeRace.status))
+  ) {
     const nextNum = sorted.find((num) => num > activeRace.race_num)
     if (nextNum == null) {
       return { kind: 'inThisRace', activeNum: activeRace.race_num, isPractice }
@@ -296,15 +296,14 @@ export function raceProgressParts(line: RaceProgressLine): {
     }
   }
   const title = `Active ${Unit} ${line.activeNum}`
+  // Header strip: next/last race — not "You are in this Race" (that stays on the popup).
   if (line.kind === 'inThisRace') {
-    return { title, detail: titleCaseProgressLine(`You are in this ${Unit}!`) }
+    return { title, detail: titleCaseProgressLine(`This is your last ${unit}.`) }
   }
   if (line.kind === 'inThisRaceWithNext') {
     return {
       title,
-      detail: titleCaseProgressLine(
-        `You are in this ${Unit}!  Your next ${unit} is ${line.nextNum}.`,
-      ),
+      detail: titleCaseProgressLine(`Your next ${unit} is ${line.nextNum}`),
     }
   }
   return {
@@ -314,7 +313,14 @@ export function raceProgressParts(line: RaceProgressLine): {
 }
 
 export function raceProgressMessage(line: RaceProgressLine): string {
+  const Unit = sessionWord(line.isPractice, true)
   const parts = raceProgressParts(line)
+  // Race Order popup still leads with "You are in this Race" when applicable.
+  if (line.kind === 'inThisRace' || line.kind === 'inThisRaceWithNext') {
+    const inThis = titleCaseProgressLine(`You are in this ${Unit}!`)
+    if (parts.title == null) return `${inThis} ${parts.detail}`
+    return `${parts.title}, ${inThis} ${parts.detail}`
+  }
   if (parts.title == null) return parts.detail
   return `${parts.title}, ${parts.detail}`
 }
