@@ -228,20 +228,27 @@ export function CompletedRacesPage() {
     }
   }
 
-  function showResults() {
+  function showResults(overrides?: {
+    className?: string
+    participantId?: number | ''
+    raceId?: number | ''
+  }) {
+    const nextClassName = overrides?.className ?? className
+    let resolvedParticipantId = overrides?.participantId ?? participantId
+    const nextRaceId = overrides?.raceId ?? raceId
+
     if (selectedEventId == null) {
       setFilterError('Pick an event.')
       return
     }
-    if (mode === 'class' && !className) {
+    if (mode === 'class' && !nextClassName) {
       setFilterError('Choose a class.')
       return
     }
-    if (mode === 'race' && raceId === '') {
+    if (mode === 'race' && nextRaceId === '') {
       setFilterError('Choose a race.')
       return
     }
-    let resolvedParticipantId = participantId
     if (mode === 'participant') {
       if (resolvedParticipantId === '' && matchingRiders.length === 1) {
         resolvedParticipantId = matchingRiders[0].participant_id
@@ -254,17 +261,17 @@ export function CompletedRacesPage() {
     }
     const nextRequest: ResultsFilter = {
       eventId: selectedEventId,
-      className: mode === 'class' ? className : null,
+      className: mode === 'class' ? nextClassName : null,
       participantId: mode === 'participant' ? Number(resolvedParticipantId) : null,
-      raceId: mode === 'race' ? Number(raceId) : null,
+      raceId: mode === 'race' ? Number(nextRaceId) : null,
     }
     const nextSelection: StoredResultsSelection = {
       seriesFilter,
       eventId: selectedEventId,
       mode,
-      className: mode === 'class' ? className : '',
+      className: mode === 'class' ? nextClassName : '',
       participantId: mode === 'participant' ? Number(resolvedParticipantId) : '',
-      raceId: mode === 'race' ? Number(raceId) : '',
+      raceId: mode === 'race' ? Number(nextRaceId) : '',
       request: nextRequest,
     }
     setFilterError(null)
@@ -495,7 +502,11 @@ export function CompletedRacesPage() {
                     className="control min-w-0 flex-1"
                     title="Choose a class"
                     value={className}
-                    onChange={(event) => setClassName(event.target.value)}
+                    onChange={(event) => {
+                      const next = event.target.value
+                      setClassName(next)
+                      if (next) showResults({ className: next })
+                    }}
                   >
                     <option value="">Select a class</option>
                     {(classesQuery.data ?? []).map((row) => (
@@ -523,9 +534,11 @@ export function CompletedRacesPage() {
                       title="Choose a rider"
                       size={participantSelectSize}
                       value={participantId === '' ? '' : String(participantId)}
-                      onChange={(event) =>
-                        setParticipantId(event.target.value ? Number(event.target.value) : '')
-                      }
+                      onChange={(event) => {
+                        const next = event.target.value ? Number(event.target.value) : ''
+                        setParticipantId(next)
+                        if (next !== '') showResults({ participantId: next })
+                      }}
                     >
                       {!participantSelectExpanded ? <option value="">Select a rider</option> : null}
                       {matchingRiders.length === 0 ? (
@@ -549,7 +562,11 @@ export function CompletedRacesPage() {
                     className="control min-w-0 flex-1"
                     title="Choose a race"
                     value={raceId === '' ? '' : String(raceId)}
-                    onChange={(event) => setRaceId(event.target.value ? Number(event.target.value) : '')}
+                    onChange={(event) => {
+                      const next = event.target.value ? Number(event.target.value) : ''
+                      setRaceId(next)
+                      if (next !== '') showResults({ raceId: next })
+                    }}
                   >
                     <option value="">Select a race</option>
                     {(racesQuery.data ?? []).map((race) => (
