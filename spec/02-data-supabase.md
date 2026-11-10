@@ -57,8 +57,11 @@ Function `place_label(pos int)`: `NULL` → null; `> 80` → `DNS/DNF`; else pos
 |---|---|
 | `race_in_progress` | Races In Progress header (0 or 1 row per series/event filter) |
 | `active_race_timing` | Timing rows (place, laps, gaps, names, plates) |
-| `event_class_results` | Completed Races grid |
+| `event_class_results` | Completed Races grid; Analyze series aggregation |
+| `event_entries_view` | Results / Analyze rider pickers |
 | `race_class_names` | Classes under a race (also `race_class` + `classes` on Race Order) |
+
+Table `event_points` (not a view) feeds Place→Points enrichment on Completed Races and Analyze.
 
 `race_in_progress` already joins `races` + `events` + `status` where `races.active` is true and status ∈ (`Staging`, `Active`, `Paused`, `Finished`). Finished stays in the view so the live page can keep showing that race and its `active_race_timing` rows until the race is no longer active.
 
@@ -236,6 +239,41 @@ select position, points
 from public.event_points
 where event_id = $event_id;
 ```
+
+### Analyze (series aggregation)
+
+Client-derived only — no series standings table. Scope: resolved org’s series (picker defaults to Event Code series).
+
+```sql
+-- Events in the selected series (date ascending for charts)
+select event_id, series_id, name, description, date, track, location
+from public.events
+where series_id = $series_id
+order by date asc;
+
+-- All class results for those events
+select *
+from public.event_class_results
+where event_id = any($event_ids);
+
+-- Points tables for Place/Points enrichment (same rules as Completed Races)
+select event_id, position, points, status
+from public.event_points
+where event_id = any($event_ids);
+
+-- Riders who entered any event in the series (dedupe in client)
+select participant_id, first_name, last_name, participant_plate, event_id
+from public.event_entries_view
+where event_id = any($event_ids);
+```
+
+Championship points / rank / avg place / moto averages / head-to-head are computed in `src/lib/analyzeMetrics.ts` from the enriched rows. Do not invent race facts outside this payload when calling Analyze AI.
+
+### Analyze AI proxy
+
+- Browser POSTs `{ question, data }` to `/api/analyze` (dev/preview) or `VITE_ANALYZE_API_URL` (production Edge Function).
+- Server holds `GROQ_API_KEY`; model returns JSON `{ answer, chart? }` grounded in `data` only.
+- Client may enforce a soft daily question cap in `localStorage` (`eventsync.analyzeAiUsage`).
 
 ## Types
 

@@ -6,4 +6,6 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_PUBLISHABLE_KEY: string
   /** When true, Points require every moto 1…max. Default / missing = false. */
   readonly VITE_REQUIRE_ALL_MOTOS?: string
+  /** Optional override for Analyze AI proxy (default `/api/analyze`). */
+  readonly VITE_ANALYZE_API_URL?: string
 }

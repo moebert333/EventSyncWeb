@@ -15,6 +15,7 @@ Do not substitute unless the spec is updated.
 | Client | `@supabase/supabase-js` | Browser client only |
 | PWA | `vite-plugin-pwa` | Installable on iOS/Android |
 | Hosting | Vercel, Netlify, or Cloudflare Pages | HTTPS required for PWA + Auth |
+| Analyze AI (optional) | Groq Chat Completions (OpenAI-compatible) | Free-tier OK for commercial; proxied — never call from the browser with a public key |
 
 **Out of scope:** Next.js, TanStack Start, Express, XAMPP, IIS, service-role key in the frontend.
 
@@ -23,11 +24,21 @@ Do not substitute unless the spec is updated.
 ```bash
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
+# When true, Points require every moto 1…max scored. Default false = Points after any one moto.
+VITE_REQUIRE_ALL_MOTOS=false
+# Server-only (never VITE_): Vite /api/analyze proxy for Analyze AI (Groq).
+GROQ_API_KEY=
+# Optional; default openai/gpt-oss-120b (llama-3.3-70b-versatile retired on free/dev tiers).
+# GROQ_MODEL=openai/gpt-oss-120b
+# Optional production override (e.g. Supabase Edge Function URL). Default: /api/analyze
+# VITE_ANALYZE_API_URL=
 ```
 
 - Rename from dashboard “anon” / “publishable” key.
-- **Never** put the service role key in the Vite app or git.
+- **Never** put the service role key or `GROQ_API_KEY` in a `VITE_*` var, the client bundle, or git.
 - File: `.env.local` (gitignored). Provide `.env.example` with empty keys.
+- Local/preview: `vite.config.ts` loads `GROQ_API_KEY` via `loadEnv` and mounts POST `/api/analyze` (see `scripts/groqAnalyzePlugin.ts`).
+- Production static hosts: deploy `supabase/functions/analyze-ai` with secret `GROQ_API_KEY`, then set `VITE_ANALYZE_API_URL` to that function URL.
 
 ## Auth choices (locked)
 
@@ -76,18 +87,26 @@ eventsync/
     hooks/useEventCode.ts
     hooks/useRaceInProgress.ts
     hooks/useEventResults.ts
+    hooks/useSeriesAnalyzeData.ts
+    lib/analyzeMetrics.ts
+    lib/analyzePanels.ts
+    lib/analyzeAiClient.ts
     components/
     components/SelectParticipantBox.tsx
     components/EventParticipantHeader.tsx
+    components/analyze/                 # Analyze panels, charts, AI section
     pages/HomePage.tsx
     pages/RacesInProgressPage.tsx
     pages/CompletedRacesPage.tsx
+    pages/AnalyzePage.tsx
     pages/admin/AdminLoginPage.tsx
     pages/admin/AdminCallbackPage.tsx
     pages/admin/OrganizationAdminPage.tsx
     pages/RaceOrderPage.tsx
     hooks/useEventRaceOrder.ts
     pages/future/LiveStreamPage.tsx     # stub + “coming soon”
+  scripts/groqAnalyzePlugin.ts          # Vite POST /api/analyze → Groq
+  supabase/functions/analyze-ai/        # optional production AI proxy
 ```
 
 ## VS Code
@@ -148,6 +167,7 @@ On valid code:
 5. Races In Progress + Completed Races.
 6. Re-deploy and test.
 7. Race Order page + Live Stream / announcements (stream stub ok).
-8. Re-deploy and test.
+8. Dashboard (`/dashboard`): series standings summary, panel board, Groq AI proxy.
+9. Re-deploy and test.
 
 Do not start PWA or live pages before Home + Event Code resolution works.

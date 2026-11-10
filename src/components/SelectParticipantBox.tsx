@@ -64,6 +64,12 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
     onOk()
   }
 
+  function selectFirstFromSearch() {
+    if (actionsBusy) return
+    if (!needle || riders.length === 0) return
+    chooseRider(riders[0])
+  }
+
   const panel = (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-20"
@@ -72,10 +78,14 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
       aria-label="Select rider"
       onKeyDown={(event) => {
         if (event.key !== 'Enter') return
-        if (actionsBusy || !onOk) return
         // Rider list buttons already confirm on activation.
         if (event.target instanceof HTMLElement && event.target.closest('ul button')) return
         event.preventDefault()
+        if (needle) {
+          selectFirstFromSearch()
+          return
+        }
+        if (actionsBusy || !onOk) return
         confirmOk()
       }}
     >
@@ -91,6 +101,16 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
             title="Filter riders by name or plate"
             value={riderSearch}
             onChange={(event) => setRiderSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return
+              event.preventDefault()
+              if (needle) {
+                selectFirstFromSearch()
+                return
+              }
+              if (actionsBusy || !onOk) return
+              confirmOk()
+            }}
           />
         </label>
         {listOpen ? (

@@ -4,6 +4,7 @@ import { RequireEventContext } from './components/RequireEventContext'
 import { hasSupabaseEnv } from './lib/supabase'
 import { AdminCallbackPage } from './pages/admin/AdminCallbackPage'
 import { AdminPage } from './pages/admin/AdminPage'
+import { AnalyzePage } from './pages/AnalyzePage'
 import { CompletedRacesPage } from './pages/CompletedRacesPage'
 import { LiveStreamPage } from './pages/future/LiveStreamPage'
 import { HomePage } from './pages/HomePage'
@@ -49,6 +50,15 @@ export const router = createBrowserRouter(
                 </RequireEventContext>
               ),
             },
+            {
+              path: '/dashboard',
+              element: (
+                <RequireEventContext>
+                  <AnalyzePage />
+                </RequireEventContext>
+              ),
+            },
+            { path: '/analyze', element: <Navigate to="/dashboard" replace /> },
             {
               path: '/stream',
               element: (

@@ -4,7 +4,7 @@ Use this file when starting or resuming work in Cursor. The executable specs are
 
 ## Project in one sentence
 
-EventSync is a Vite + React + TypeScript PWA. Spectators enter an Event Code (no login) and see live race timing and results from Supabase. Organization admins use a magic link plus an allowlist and a claim code. The local race app is the source of truth for organizations, series, events, and all timing data.
+EventSync is a Vite + React + TypeScript PWA. Spectators enter an Event Code (no login) and see live race timing, results, and series Analyze dashboards from Supabase (optional Groq AI via a server proxy). Organization admins use a magic link plus an allowlist and a claim code. The local race app is the source of truth for organizations, series, events, and all timing data.
 
 ## Spec files (read these first)
 
@@ -22,7 +22,7 @@ EventSync is a Vite + React + TypeScript PWA. Spectators enter an Event Code (no
 ## Hard rules
 
 - Vite + React + TypeScript + Tailwind + React Router + TanStack Query + `@supabase/supabase-js`.
-- No Next.js, no Express, no service-role key in the client.
+- No Next.js, no Express, no service-role key in the client. Analyze AI uses Vite `/api/analyze` middleware locally and an optional Supabase Edge Function in production — never put `GROQ_API_KEY` in `VITE_*`.
 - Spectators never sign in. Access is Event Code, QR, or `/?code=`.
 - Admins use magic link + `admin_allowlist` + claim code. `/admin` is not in the public nav.
 - Website does not create organizations, series, events, timing, entries, or results. The local race app does.
@@ -77,9 +77,10 @@ Create `.env.local` (gitignored):
 ```bash
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
+GROQ_API_KEY=
 ```
 
-Never commit the service role key.
+Never commit the service role key or Groq API key.
 
 ## Phase order (do not skip ahead)
 
@@ -89,7 +90,8 @@ Never commit the service role key.
 4. Deploy HTTPS and set Supabase Auth redirect URLs.
 5. Races In Progress (`/live`) and Completed Races (`/results`), with Realtime on live timing.
 6. Re-deploy and test.
-7. FUTURE stubs only unless the spec is updated: race order, announcements, live stream.
+7. Race Order + Live Stream stub (as implemented); Dashboard (`/dashboard`) with series metrics + Groq proxy.
+8. FUTURE: announcements, multi-camera live stream — unless the spec is updated.
 
 ## First files Cursor should create
 
@@ -118,6 +120,19 @@ src/hooks/useLiveTiming.ts
 src/hooks/useEventResults.ts
 src/pages/RacesInProgressPage.tsx
 src/pages/CompletedRacesPage.tsx
+```
+
+Analyze (after Results exists):
+
+```text
+src/pages/AnalyzePage.tsx
+src/hooks/useSeriesAnalyzeData.ts
+src/lib/analyzeMetrics.ts
+src/lib/analyzePanels.ts
+src/lib/analyzeAiClient.ts
+src/components/analyze/
+scripts/groqAnalyzePlugin.ts
+supabase/functions/analyze-ai/
 ```
 
 ## Admin flow Cursor must follow

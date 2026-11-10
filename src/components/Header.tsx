@@ -6,6 +6,7 @@ const links = [
   { to: '/order', label: 'Race Order', title: 'View race order for this event', end: false },
   { to: '/live', label: 'Active Race', title: 'View live race timing', end: false },
   { to: '/results', label: 'Results', title: 'View completed race results', end: false },
+  { to: '/dashboard', label: 'Dashboard', title: 'Rider series results dashboard', end: false },
   { to: '/stream', label: 'Live Stream', title: 'View live stream (coming soon)', end: false },
 ]
 

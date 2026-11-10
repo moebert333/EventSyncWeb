@@ -7,6 +7,7 @@ Build only what `00`–`04` specify. FUTURE pages may be stubs.
 ```text
 Vite + React + TypeScript + Tailwind + React Router + TanStack Query + Supabase.
 No Next.js, no Express, no service-role key in the client.
+GROQ_API_KEY is server-only (Vite /api/analyze or Edge Function); never VITE_GROQ_*.
 Spectators never sign in.
 Admins use magic link + admin_allowlist.
 Every public query is filtered by Event Code context.
@@ -18,7 +19,7 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] App created with Vite `react-ts`
 - [ ] Tailwind and Router working
 - [ ] `.vscode` debug launches Chrome at `http://localhost:5173`
-- [ ] `.env.example` documents `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
+- [ ] `.env.example` documents `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_REQUIRE_ALL_MOTOS`, and `GROQ_API_KEY` (server-only; never `VITE_GROQ_*`)
 - [ ] Supabase client lives in `src/lib/supabase.ts`
 
 ## B. Event Code (public)
@@ -27,14 +28,14 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] `/?code=VALUE` resolves the same way
 - [ ] Valid code stores org + series + event and shows names in the header
 - [ ] Unknown code shows an error and does not send the user to `/live`
-- [ ] `/live` and `/results` without context redirect to Home with the code field emphasized
+- [ ] `/live`, `/results`, `/dashboard`, and `/order` without context redirect to Home with the code field emphasized
 - [ ] Codes compare case-insensitively
 - [ ] Context survives refresh and PWA relaunch (`localStorage`)
 - [ ] User can enter a different code to switch events/orgs
 
 ## C. Home
 
-- [ ] Top nav: Home, Race Order, Races In Progress, Completed Races, Live Stream
+- [ ] Top nav includes Race Order, Active Race, Results, Dashboard, Live Stream (Dashboard after Results)
 - [ ] Actionable controls show a short hover description (`title`)
 - [ ] No Admin link in that nav
 - [ ] Large marketing description of the product
@@ -137,9 +138,32 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] Completed / Active / Participant marked by color and label
 - [ ] Empty and error states handled
 
+## H2. Dashboard
+
+- [ ] `/dashboard` requires Event Code context; no Live/Results-style page title banner; nav label is Dashboard
+- [ ] Series | Rider | Class in header; Rider centered; Class lists only that rider’s series classes (default first)
+- [ ] Series picker defaults to Event Code series; lists org series only
+- [ ] Rider picker lists series entrants; updates Selected participant
+- [ ] Header Class drives Standing, Points, Events and most panels
+- [ ] Standings panel Class defaults to header Class but can change independently
+- [ ] Summary shows Standing, Points, Events (no average overall place)
+- [ ] No rider/class results → “No Results” in panel chart/data areas
+- [ ] Finish distribution pie renders for a single finish (solid slice)
+- [ ] “Analyze your Data with AI” section near top; collapses; suggested prompts + Ask
+- [ ] AI uses `/api/analyze` or `VITE_ANALYZE_API_URL`; `GROQ_API_KEY` never in client bundle
+- [ ] AI answers grounded in series snapshot JSON; optional chart render
+- [ ] Six default panels: place over time, finish distribution, series standings, points accumulation, moto consistency, Recent Momentum
+- [ ] Panels collapse, share similar expanded min-height, drag-reorder (mouse + mobile long-press), Select to unused catalog panels
+- [ ] Catalog also includes reliability, bike make vs class, head-to-head
+- [ ] Series standings panel has class selector for any class in the series
+- [ ] Panel layout persists (`eventsync.analyzePanelLayout`)
+- [ ] Column count follows viewport/container width breakpoints
+- [ ] Empty / loading / error states when no rider, no results, or fetch fails
+
 ## I. Security
 
 - [ ] Service role key absent from repo and client bundle
+- [ ] `GROQ_API_KEY` absent from client bundle and `VITE_*` env
 - [ ] RLS enabled; anon cannot write
 - [ ] Admin writes limited to org/series/events/event_codes as specified
 - [ ] Timing/results writes remain the local race app’s job
@@ -152,6 +176,7 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] Auth redirect URLs updated
 - [ ] Installable on Android Chrome; iOS hint documented or shown
 - [ ] Live data not served from a stale SW cache as if current
+- [ ] Production Analyze AI: Edge Function (or equivalent) with `GROQ_API_KEY` secret when AI is enabled
 
 ## K. Explicitly not failing MVP
 
@@ -161,6 +186,8 @@ PWA after Home + Admin work, not before Event Code resolution.
 - Offline timing
 - Allowlist admin UI
 - Perfect pixel clone of motocrossactionmag.com
+- Unlimited free Groq quota (soft client daily cap is enough)
+- Persisted championship table in Supabase (client-derived standings OK)
 
 ## Suggested test Event Code
 
