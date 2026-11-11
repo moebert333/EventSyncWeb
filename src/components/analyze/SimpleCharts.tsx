@@ -144,13 +144,11 @@ export function SimpleLineChart({
   }
 
   function showCategoryTip(event: MouseEvent, index: number) {
-    const lines: TipLine[] = series
-      .map((item) => {
-        const value = item.data[index]
-        if (!Number.isFinite(value) || (value as number) <= 0) return null
-        return { label: item.name, value: formatValue(value as number), color: item.color }
-      })
-      .filter((line): line is TipLine => line != null)
+    const lines: TipLine[] = series.flatMap((item) => {
+      const value = item.data[index]
+      if (!Number.isFinite(value) || (value as number) <= 0) return []
+      return [{ label: item.name, value: formatValue(value as number), color: item.color }]
+    })
     if (reference != null) {
       lines.push({
         label: reference.label,

@@ -205,13 +205,11 @@ export function AnalyzePanelBody({
   if (panelId === 'motoConsistency') {
     if (!hasRiderResults) return <NoResults />
     const { moto1, moto2, moto3 } = snapshot.motoAverages
-    const motoBars = (
-      [
-        { label: 'Moto 1', value: moto1, color: '#38bdf8' },
-        { label: 'Moto 2', value: moto2, color: '#fbbf24' },
-        { label: 'Moto 3', value: moto3, color: '#4ade80' },
-      ] as const
-    ).filter(
+    const motoBars = [
+      { label: 'Moto 1', value: moto1, color: '#38bdf8' },
+      { label: 'Moto 2', value: moto2, color: '#fbbf24' },
+      { label: 'Moto 3', value: moto3, color: '#4ade80' },
+    ].filter(
       (row): row is { label: string; value: number; color: string } =>
         row.value != null && row.value > 0,
     )
@@ -417,13 +415,11 @@ export function AnalyzePanelBody({
   if (panelId === 'lastRaceBreakdown') {
     if (!hasRiderResults || !snapshot.lastRaceBreakdown) return <NoResults />
     const last = snapshot.lastRaceBreakdown
-    const motoBars = (
-      [
-        { label: 'Moto 1', value: last.race1, color: '#38bdf8' },
-        { label: 'Moto 2', value: last.race2, color: '#fbbf24' },
-        { label: 'Moto 3', value: last.race3, color: '#4ade80' },
-      ] as const
-    ).filter(
+    const motoBars = [
+      { label: 'Moto 1', value: last.race1, color: '#38bdf8' },
+      { label: 'Moto 2', value: last.race2, color: '#fbbf24' },
+      { label: 'Moto 3', value: last.race3, color: '#4ade80' },
+    ].filter(
       (row): row is { label: string; value: number; color: string } =>
         row.value != null && row.value > 0,
     )
@@ -505,13 +501,11 @@ export function AnalyzePanelBody({
   if (panelId === 'motoSpread') {
     if (!hasRiderResults || !snapshot.motoSpread) return <NoResults />
     const spread = snapshot.motoSpread
-    const motoBars = (
-      [
-        { label: 'Moto 1', value: spread.race1, color: '#38bdf8' },
-        { label: 'Moto 2', value: spread.race2, color: '#fbbf24' },
-        { label: 'Moto 3', value: spread.race3, color: '#4ade80' },
-      ] as const
-    ).filter(
+    const motoBars = [
+      { label: 'Moto 1', value: spread.race1, color: '#38bdf8' },
+      { label: 'Moto 2', value: spread.race2, color: '#fbbf24' },
+      { label: 'Moto 3', value: spread.race3, color: '#4ade80' },
+    ].filter(
       (row): row is { label: string; value: number; color: string } =>
         row.value != null && row.value > 0,
     )
