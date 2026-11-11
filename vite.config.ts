@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
-import { groqAnalyzePlugin } from './scripts/groqAnalyzePlugin.ts'
+import { xaiAnalyzePlugin } from './scripts/xaiAnalyzePlugin.ts'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      groqAnalyzePlugin(env.GROQ_API_KEY, env.GROQ_MODEL),
+      xaiAnalyzePlugin(env.XAI_API_KEY, env.XAI_MODEL),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'favicon-32x32.png', 'apple-touch-icon.png', 'app-icon.svg', 'rider.svg'],

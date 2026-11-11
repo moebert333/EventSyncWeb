@@ -281,7 +281,57 @@ Generate or hand-write `src/types/database.ts` covering tables + views used by t
 
 ## Seed / fixtures (dev)
 
+### Minimal smoke seed (`supabase/seed.sql`)
+
+Optional tiny fixture for empty projects:
+
 - 1 organization, 1 series, 2 events (one with code `DEMO01AB`)
 - 2 classes, 1 active race + `status = 'Active'`, a few `active_timing` rows
 - 1 completed event with `event_results`
 - 1 `admin_allowlist` email matching the developer
+
+### Moto Challenge 2027 sample dataset (required for realistic testing)
+
+Maintain a **regenerable** sample dataset for integration testing of Live, Race Order, Results, and Dashboard against real Supabase data.
+
+**Scripts (repo):**
+
+| Path | Role |
+|---|---|
+| `scripts/generate_moto_challenge_seed.py` | Builds randomized SQL for the sample org |
+| `scripts/apply_sql_to_supabase.py` | Applies a `.sql` file via Postgres URI |
+| `scripts/seed-moto-challenge.ps1` | Generate then apply in one step (Windows) |
+| `supabase/seed_moto_challenge_2027.sql` | Last generated SQL artifact (safe to regenerate) |
+
+**Credentials:** use a Postgres connection string (`SUPABASE_DIRECT_CONNECT_STRING` or `SUPABASE_DB_URL` / `SUPABASE_DB_PASSWORD` in `.env.local`). Do **not** use the publishable or `service_role` API keys to apply this script.
+
+**Wipe scope:** delete only the sample organization (`org_key = mx-racing-inc`) and cascaded rows, then reload. Do not wipe unrelated orgs.
+
+**Required shape each generation:**
+
+| Item | Requirement |
+|---|---|
+| Organization | Name `MX Racing Inc`, `org_key` `mx-racing-inc` |
+| Series | `Moto Challenge 2027` |
+| Events | **5** events, dates spring→summer **2027**, names `{Track}-{Month} Event`, fictitious Colorado tracks/locations |
+| Event codes | `MX-2027-1` … `MX-2027-5` (easy to remember; 4–12 chars) |
+| Participants | ~**150** org-scoped riders; random names; **more males than females**; cities mostly Colorado; same riders reused across all events |
+| Classes | ~**10** class names in `classes` (per event); class sizes vary but sum ≈ 150; **same class roster** (same riders in the same class names) every event |
+| Entries | `event_entry` for every rider/class/event |
+| Motos / races | **2** motos per class; `session_name` like `DIV::1::MOTO 1` / `MOTO 2`; `race_class` links classes to races |
+| Combined races | **5** races that run **2** smaller classes together; remaining races single-class |
+| Events 1–3 | All races `completed`; full `event_results` (moto finishes + overall); `event_points` for Place→Points |
+| Event 4 (live) | Races **1–10** completed; race **11** `active` with `status = 'Active'`, `events.active_race_id` set, and ≥**5** laps in `active_timing` (shaped like live timing / simulation); remaining races scheduled only (entries + race order, not completed, no timing) |
+| Event 5 (future) | Same schedule + entries as other rounds; **no** results / timing / completed races |
+| `race_timing` | Not required for completed races; live path uses `active_timing` + `status` |
+| Admin | `admin_allowlist` row for the developer email on this org |
+| Randomness | Each generator run uses a **fresh RNG seed** so names, places, and lap times differ unless `--seed` is passed |
+
+**How to load:**
+
+```powershell
+.\scripts\seed-moto-challenge.ps1
+# or: .\scripts\seed-moto-challenge.ps1 -DbPassword "..." / -DatabaseUrl "postgresql://..."
+```
+
+After load, smoke-test with Event Codes `MX-2027-1`…`MX-2027-5` (live timing on `MX-2027-4`).

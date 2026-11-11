@@ -6,6 +6,11 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_PUBLISHABLE_KEY: string
   /** When true, Points require every moto 1…max. Default / missing = false. */
   readonly VITE_REQUIRE_ALL_MOTOS?: string
+  /**
+   * Cap Dashboard series events to this many (earliest by date).
+   * Use `2` to test the ≤2-event early-series layout. Unset = load all.
+   */
+  readonly VITE_DASHBOARD_MAX_EVENTS?: string
   /** Optional override for Analyze AI proxy (default `/api/analyze`). */
   readonly VITE_ANALYZE_API_URL?: string
 }

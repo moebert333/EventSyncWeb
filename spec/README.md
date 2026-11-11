@@ -6,7 +6,7 @@ Executable build specs for the EventSync Vite + React + TypeScript + Supabase PW
 |---|---|
 | [00-product.md](./00-product.md) | Purpose, personas, jobs, non-goals |
 | [01-stack.md](./01-stack.md) | Frozen stack, env, VS Code, phases, Event Code URL |
-| [02-data-supabase.md](./02-data-supabase.md) | Existing schema, required migrations, RLS, queries |
+| [02-data-supabase.md](./02-data-supabase.md) | Existing schema, required migrations, RLS, queries, sample seed scripts |
 | [03-ui.md](./03-ui.md) | Pages, routes (incl. Dashboard), states, MX magazine visual direction, simulation mode |
 | [04-pwa.md](./04-pwa.md) | Installability, caching, persistence |
 | [05-acceptance.md](./05-acceptance.md) | Checklists for an agent or human implementer |
@@ -30,3 +30,4 @@ Executable build specs for the EventSync Vite + React + TypeScript + Supabase PW
 - PWA: app shell offline, live timing network-only
 - Admin URL hidden from public nav
 - **Simulation mode** (Ctrl+click or long-press brand on `/live`): client-only fake Active Race timing; leave `/live` confirms cancel; hides Active Race header while running; Pause / Continue / Stop; races only; lap 2–120s (default 15); never writes timing DB
+- **Moto Challenge sample seed**: `scripts/seed-moto-challenge.ps1` regenerates and loads org `MX Racing Inc` / series `Moto Challenge 2027` (codes `MX-2027-1`…`5`; live on `MX-2027-4`); wipe only that org; Postgres URI required (not API keys)

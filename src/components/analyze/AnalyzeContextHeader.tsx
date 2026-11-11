@@ -23,6 +23,14 @@ type Props = {
   seriesName: string
 }
 
+const LINK_MAX = 15
+
+function shortLinkLabel(text: string, max = LINK_MAX): string {
+  const trimmed = text.trim()
+  if (trimmed.length <= max) return trimmed
+  return `${trimmed.slice(0, max - 1)}…`
+}
+
 export function AnalyzeContextHeader({
   seriesList,
   seriesId,
@@ -44,11 +52,14 @@ export function AnalyzeContextHeader({
 
   const selected = selectedParticipant
 
-  const participantLabel = selected
+  const participantFull = selected
     ? `${riderName(selected.firstName, selected.lastName)}${
-        selected.participantPlate ? ` · ${selected.participantPlate}` : ''
+        selected.participantPlate ? `-${selected.participantPlate}` : ''
       }`
     : 'Select rider'
+
+  const seriesFull = seriesName || 'Select series'
+  const classFull = className ?? (selected ? 'No class' : '—')
 
   const needle = riderSearch.trim().toLowerCase()
   const filteredRiders = useMemo(() => {
@@ -236,71 +247,76 @@ export function AnalyzeContextHeader({
       )
     : null
 
+  const linkClass =
+    'cursor-pointer text-lg font-bold text-[#f5c518] underline underline-offset-2 hover:text-[#ffe566]'
+
   return (
     <>
       <div className="-mx-4 -mt-6 border-b border-[#f5c518]/35 bg-[#252525] px-4 py-3 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-start sm:gap-4">
-          <div className="min-w-0 space-y-1">
-            <p className="text-sm uppercase tracking-wide text-zinc-500">Series</p>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-base">
+          <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+            <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-500">Series</span>
             <button
               type="button"
-              className="max-w-full truncate text-left text-lg font-bold text-[#f5c518] underline underline-offset-2"
-              title="Change series"
+              className={linkClass}
+              title={seriesFull}
               onClick={() => setSeriesOpen(true)}
             >
-              {seriesName || 'Select series'}
+              {shortLinkLabel(seriesFull)}
             </button>
-          </div>
-          <div className="min-w-0 space-y-1 sm:text-center">
-            <p className="text-sm uppercase tracking-wide text-zinc-500">Rider</p>
+          </span>
+          <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+            <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-500">Rider</span>
             <button
               type="button"
-              className="max-w-full truncate text-lg font-bold text-[#f5c518] underline underline-offset-2 sm:text-center"
-              title={selected ? 'Change rider' : 'Select rider'}
+              className={linkClass}
+              title={participantFull}
               onClick={() => setRiderOpen(true)}
             >
-              {participantLabel}
+              {shortLinkLabel(participantFull)}
             </button>
-          </div>
-          <div className="min-w-0 space-y-1 sm:text-right">
-            <p className="text-sm uppercase tracking-wide text-zinc-500">Class</p>
+          </span>
+          <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+            <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-500">Class</span>
             <button
               type="button"
-              className="max-w-full truncate text-lg font-bold text-[#f5c518] underline underline-offset-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50 sm:text-right"
-              title={className ? 'Change class' : 'Select class'}
+              className={`${linkClass} disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50`}
+              title={classFull}
               disabled={!selected || riderClassNames.length === 0}
               onClick={() => setClassOpen(true)}
             >
-              {className ?? (selected ? 'No class' : '—')}
+              {shortLinkLabel(classFull)}
             </button>
-          </div>
+          </span>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="border border-white/10 bg-[#1a1a1a] px-3 py-2">
-            <p className="text-[0.7rem] uppercase tracking-wide text-zinc-500">Standing</p>
-            <p className="font-display text-2xl font-bold text-white">
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <div className="inline-flex w-auto items-baseline gap-2 border border-white/10 bg-[#1a1a1a] px-3 py-2">
+            <span className="text-sm uppercase tracking-wide text-zinc-400">Standing</span>
+            <span className="font-display text-2xl font-bold leading-none text-white">
               {summary.seriesRank != null ? `${summary.seriesRank}` : '—'}
-            </p>
+            </span>
           </div>
-          <div className="border border-white/10 bg-[#1a1a1a] px-3 py-2">
-            <p className="text-[0.7rem] uppercase tracking-wide text-zinc-500">Points</p>
-            <p className="font-display text-2xl font-bold text-white">{summary.seriesPoints}</p>
+          <div className="inline-flex w-auto items-baseline gap-2 border border-white/10 bg-[#1a1a1a] px-3 py-2">
+            <span className="text-sm uppercase tracking-wide text-zinc-400">Points</span>
+            <span className="font-display text-2xl font-bold leading-none text-white">
+              {summary.seriesPoints}
+            </span>
           </div>
-          <div className="border border-white/10 bg-[#1a1a1a] px-3 py-2">
-            <p className="text-[0.7rem] uppercase tracking-wide text-zinc-500">Events</p>
-            <p className="font-display text-2xl font-bold text-white">
+          <div className="inline-flex w-auto items-baseline gap-2 border border-white/10 bg-[#1a1a1a] px-3 py-2">
+            <span className="text-sm uppercase tracking-wide text-zinc-400">Events</span>
+            <span className="font-display text-2xl font-bold leading-none text-white">
               {summary.eventsRaced}/{summary.eventsInSeries || '—'}
-            </p>
+            </span>
           </div>
+          {summary.gapToLeader != null && summary.gapToLeader > 0 ? (
+            <p className="hidden text-sm text-zinc-400 sm:block">
+              {summary.gapToLeader} pts behind the class leader
+            </p>
+          ) : summary.gapToLeader === 0 && summary.seriesRank === 1 ? (
+            <p className="hidden text-sm text-green-400 sm:block">Leading the class</p>
+          ) : null}
         </div>
-        {summary.gapToLeader != null && summary.gapToLeader > 0 ? (
-          <p className="mt-2 text-sm text-zinc-400">
-            {summary.gapToLeader} pts behind the class leader
-          </p>
-        ) : summary.gapToLeader === 0 && summary.seriesRank === 1 ? (
-          <p className="mt-2 text-sm text-green-400">Leading the class</p>
-        ) : null}
       </div>
       {seriesPicker}
       {riderPicker}

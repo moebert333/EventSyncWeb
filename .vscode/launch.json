@@ -7,7 +7,38 @@
       "name": "Launch Chrome against localhost",
       "url": "http://localhost:5173",
       "webRoot": "${workspaceFolder}",
-      "preLaunchTask": "dev"
+      "preLaunchTask": "dev",
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ]
+    },
+    {
+      "name": "Generate Moto Challenge seed SQL",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/generate_moto_challenge_seed.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": [
+        "--out",
+        "${workspaceFolder}/supabase/seed_moto_challenge_2027.sql"
+      ]
+    },
+    {
+      "name": "Apply Moto Challenge seed SQL",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/apply_sql_to_supabase.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env.local",
+      "args": [
+        "--sql",
+        "${workspaceFolder}/supabase/seed_moto_challenge_2027.sql",
+        "--repo-root",
+        "${workspaceFolder}"
+      ]
     }
   ]
 }

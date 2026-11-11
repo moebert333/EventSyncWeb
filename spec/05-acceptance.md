@@ -189,6 +189,18 @@ PWA after Home + Admin work, not before Event Code resolution.
 - Unlimited free Groq quota (soft client daily cap is enough)
 - Persisted championship table in Supabase (client-derived standings OK)
 
-## Suggested test Event Code
+## L. Moto Challenge sample seed
 
-`DEMO01AB` (seed in dev) → one org, one live race, one completed event with results.
+- [ ] `scripts/generate_moto_challenge_seed.py` regenerates `supabase/seed_moto_challenge_2027.sql` with a new random dataset each run (optional `--seed` for reproducibility)
+- [ ] `scripts/seed-moto-challenge.ps1` generates SQL then applies it using `SUPABASE_DIRECT_CONNECT_STRING` / `SUPABASE_DB_URL` / `SUPABASE_DB_PASSWORD` (not API keys)
+- [ ] Apply wipes only `org_key = mx-racing-inc` and reloads that org
+- [ ] Org `MX Racing Inc`, series `Moto Challenge 2027`, five 2027 events, codes `MX-2027-1`…`MX-2027-5`
+- [ ] ~150 riders, ~10 classes, same class rosters across events; ~2 motos/class; 5 combined (2-class) races
+- [ ] Events 1–3 have full `event_results`; Event 4 has races 1–10 completed, race 11 active with ≥5 `active_timing` laps; Event 5 has schedule/entries only
+- [ ] `admin_allowlist` includes the configured developer email for that org
+- [ ] Site smoke: Event Code `MX-2027-4` shows live timing; `MX-2027-1`…`3` show results; `MX-2027-5` has no completed results yet
+
+## Suggested test Event Codes
+
+- Minimal: `DEMO01AB` (`supabase/seed.sql`) → one org, one live race, one completed event with results.
+- Realistic: `MX-2027-1`…`MX-2027-5` (Moto Challenge sample; live on `MX-2027-4`).

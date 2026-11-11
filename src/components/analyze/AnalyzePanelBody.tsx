@@ -26,6 +26,15 @@ function NoResults() {
   return <p className="flex min-h-[180px] items-center justify-center text-sm text-zinc-500">No Results</p>
 }
 
+/** All riders with series points (excludes 0-point entries). */
+function standingsRowsForDisplay<T extends { points: number }>(
+  standings: T[],
+): { row: T; rank: number }[] {
+  return standings
+    .filter((row) => row.points > 0)
+    .map((row, index) => ({ row, rank: index + 1 }))
+}
+
 export function AnalyzePanelBody({
   panelId,
   snapshot,
@@ -49,45 +58,71 @@ export function AnalyzePanelBody({
 
   if (panelId === 'placeOverTime') {
     if (!hasRiderResults) return <NoResults />
-    const places = snapshot.placeOverTime.rider.filter((n) => n > 0)
-    const yMax = Math.max(5, ...places, ...snapshot.placeOverTime.classAvg)
+    const seasonAvg = snapshot.placeOverTime.seasonAvg
+    const placeValues = [
+      ...snapshot.placeOverTime.rider,
+      ...snapshot.placeOverTime.classAvg,
+      ...(seasonAvg != null ? [seasonAvg] : []),
+    ].filter((n) => Number.isFinite(n) && n > 0)
+    const dataMin = placeValues.length ? Math.min(...placeValues) : 1
+    const dataMax = placeValues.length ? Math.max(...placeValues) : 5
+    const yMin = Math.max(1, dataMin * 0.9)
+    const yMax = Math.max(yMin + 0.1, dataMax * 1.1)
     return (
-      <div className="space-y-2">
-        <p className="text-xs text-zinc-500">Lower place is better</p>
-        <SimpleLineChart
-          categories={snapshot.placeOverTime.labels}
-          series={[
-            { name: 'You', data: snapshot.placeOverTime.rider, color: '#38bdf8' },
-            { name: 'Class avg', data: snapshot.placeOverTime.classAvg, color: '#71717a' },
-          ]}
-          invertY
-          yMin={1}
-          yMax={yMax}
-          reference={
-            snapshot.placeOverTime.seasonAvg != null
-              ? { value: snapshot.placeOverTime.seasonAvg, label: 'Season avg' }
-              : undefined
-          }
-        />
+      <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-300">
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-4 bg-[#38bdf8]" aria-hidden />
+            You
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-4 bg-[#71717a]" aria-hidden />
+            Class avg
+          </li>
+          {seasonAvg != null ? (
+            <li className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-0 w-4 border-t border-dashed border-[#4ade80]"
+                aria-hidden
+              />
+              Season avg
+            </li>
+          ) : null}
+          <li className="text-zinc-500">Lower place is better</li>
+        </ul>
+        <div className="min-h-0 flex-1">
+          <SimpleLineChart
+            categories={snapshot.placeOverTime.labels}
+            series={[
+              { name: 'You', data: snapshot.placeOverTime.rider, color: '#38bdf8' },
+              { name: 'Class avg', data: snapshot.placeOverTime.classAvg, color: '#71717a' },
+            ]}
+            height={280}
+            className="h-full w-full"
+            invertY
+            yMin={yMin}
+            yMax={yMax}
+            hideReferenceLabel
+            reference={
+              seasonAvg != null ? { value: seasonAvg, label: 'Season avg' } : undefined
+            }
+          />
+        </div>
       </div>
     )
   }
 
   if (panelId === 'finishDistribution') {
     if (!hasRiderResults) return <NoResults />
-    const { wins, podium, other } = snapshot.finishDistribution
     return (
-      <SimplePieChart
-        data={[
-          { label: 'Wins (1st)', value: wins, color: '#f5c518' },
-          { label: 'Podium (2–3)', value: podium, color: '#38bdf8' },
-          { label: '4th+', value: other, color: '#52525b' },
-        ]}
-      />
+      <div className="flex h-full min-h-0 flex-1 flex-col">
+        <SimplePieChart data={snapshot.finishDistribution} />
+      </div>
     )
   }
 
   if (panelId === 'seriesStandings') {
+    const scoredStandings = standingsRowsForDisplay(standings)
     return (
       <div className="space-y-3">
         <label className="block text-xs uppercase tracking-wide text-zinc-400">
@@ -104,7 +139,7 @@ export function AnalyzePanelBody({
             ))}
           </select>
         </label>
-        {standings.length === 0 ? (
+        {scoredStandings.length === 0 ? (
           <NoResults />
         ) : (
           <div className="max-h-52 overflow-auto">
@@ -119,12 +154,12 @@ export function AnalyzePanelBody({
                 </tr>
               </thead>
               <tbody>
-                {standings.slice(0, 12).map((row, index) => (
+                {scoredStandings.map(({ row, rank }) => (
                   <tr
                     key={row.participantId}
                     className={row.isYou ? 'bg-sky-500/15 text-sky-200' : 'text-zinc-200'}
                   >
-                    <td className="py-1 pr-2">{index + 1}</td>
+                    <td className="py-1 pr-2">{rank}</td>
                     <td className="py-1 pr-2">
                       {row.name}
                       {row.isYou ? ' (you)' : ''}
@@ -145,51 +180,132 @@ export function AnalyzePanelBody({
   if (panelId === 'pointsAccumulation') {
     if (!hasRiderResults) return <NoResults />
     return (
-      <SimpleLineChart
-        categories={snapshot.pointsAccumulation.labels}
-        series={[
-          { name: 'You', data: snapshot.pointsAccumulation.rider, color: '#38bdf8' },
-          { name: 'Leader', data: snapshot.pointsAccumulation.leader, color: '#fbbf24' },
-        ]}
-      />
+      <div className="space-y-2">
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-300">
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-4 bg-[#38bdf8]" aria-hidden />
+            You
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-4 bg-[#fbbf24]" aria-hidden />
+            Leader
+          </li>
+        </ul>
+        <SimpleLineChart
+          categories={snapshot.pointsAccumulation.labels}
+          series={[
+            { name: 'You', data: snapshot.pointsAccumulation.rider, color: '#38bdf8' },
+            { name: 'Leader', data: snapshot.pointsAccumulation.leader, color: '#fbbf24' },
+          ]}
+        />
+      </div>
     )
   }
 
   if (panelId === 'motoConsistency') {
     if (!hasRiderResults) return <NoResults />
     const { moto1, moto2, moto3 } = snapshot.motoAverages
-    if (moto1 == null && moto2 == null && moto3 == null) return <NoResults />
+    const motoBars = (
+      [
+        { label: 'Moto 1', value: moto1, color: '#38bdf8' },
+        { label: 'Moto 2', value: moto2, color: '#fbbf24' },
+        { label: 'Moto 3', value: moto3, color: '#4ade80' },
+      ] as const
+    ).filter(
+      (row): row is { label: string; value: number; color: string } =>
+        row.value != null && row.value > 0,
+    )
+    if (motoBars.length === 0) return <NoResults />
     return (
-      <SimpleBarChart
-        categories={['Moto 1', 'Moto 2', 'Moto 3']}
-        values={[moto1 ?? 0, moto2 ?? 0, moto3 ?? 0]}
-        color="#38bdf8"
-      />
+      <div className="flex h-full min-h-0 flex-1 flex-col">
+        <SimpleBarChart
+          categories={motoBars.map((row) => row.label)}
+          values={motoBars.map((row) => row.value)}
+          colors={motoBars.map((row) => row.color)}
+          height={260}
+          className="h-full w-full"
+          showYAxis
+        />
+      </div>
     )
   }
 
   if (panelId === 'recentMomentum') {
     if (!hasRiderResults) return <NoResults />
     const m = snapshot.recentMomentum
+    const placeValues = snapshot.placeOverTime.rider.filter((n) => Number.isFinite(n) && n > 0)
+    const dataMin = placeValues.length ? Math.min(...placeValues) : 1
+    const dataMax = placeValues.length ? Math.max(...placeValues) : 5
+    const yMin = Math.max(1, dataMin * 0.9)
+    const yMax = Math.max(yMin + 0.1, dataMax * 1.1)
     return (
-      <div className="grid grid-cols-3 gap-3">
-        <div className="border border-white/10 p-3">
-          <p className="text-xs uppercase text-zinc-500">Last {m.lastN || '—'}</p>
-          <p className="text-2xl font-bold text-[#f5c518]">
-            {m.improving == null ? '—' : m.improving ? '↑' : '↓'}
-          </p>
+      <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="border border-white/10 px-2 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+              Last {m.lastN || '—'}
+            </p>
+            <p
+              className={`text-lg font-bold leading-tight ${
+                m.placeChangePct == null
+                  ? 'text-[#f5c518]'
+                  : m.placeChangePct > 0
+                    ? 'text-[#4ade80]'
+                    : m.placeChangePct < 0
+                      ? 'text-[#f87171]'
+                      : 'text-[#f5c518]'
+              }`}
+            >
+              {m.placeChangePct == null
+                ? '—'
+                : `${m.placeChangePct > 0 ? '↑' : m.placeChangePct < 0 ? '↓' : '→'} ${Math.abs(Math.round(m.placeChangePct))}%`}
+            </p>
+          </div>
+          <div className="border border-white/10 px-2 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Avg place</p>
+            <p className="text-lg font-bold leading-tight">{fmt(m.avgPlace)}</p>
+          </div>
+          <div className="border border-white/10 px-2 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Pts vs leader</p>
+            <p className="text-lg font-bold leading-tight">
+              {m.ptsVsLeader == null
+                ? '—'
+                : `${m.ptsVsLeader > 0 ? '+' : ''}${m.ptsVsLeader}`}
+            </p>
+          </div>
         </div>
-        <div className="border border-white/10 p-3">
-          <p className="text-xs uppercase text-zinc-500">Avg place</p>
-          <p className="text-2xl font-bold">{fmt(m.avgPlace)}</p>
-        </div>
-        <div className="border border-white/10 p-3">
-          <p className="text-xs uppercase text-zinc-500">Pts vs leader</p>
-          <p className="text-2xl font-bold">
-            {m.ptsVsLeader == null
-              ? '—'
-              : `${m.ptsVsLeader > 0 ? '+' : ''}${m.ptsVsLeader}`}
-          </p>
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-300">
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-4 bg-[#f5c518]" aria-hidden />
+            Place
+          </li>
+          {m.avgPlace != null ? (
+            <li className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-0 w-4 border-t border-dashed border-[#4ade80]"
+                aria-hidden
+              />
+              Recent avg
+            </li>
+          ) : null}
+          <li className="text-zinc-500">Lower place is better</li>
+        </ul>
+        <div className="min-h-0 flex-1">
+          <SimpleLineChart
+            categories={snapshot.placeOverTime.labels}
+            series={[
+              { name: 'Place', data: snapshot.placeOverTime.rider, color: '#f5c518' },
+            ]}
+            height={160}
+            className="h-full w-full"
+            invertY
+            yMin={yMin}
+            yMax={yMax}
+            hideReferenceLabel
+            reference={
+              m.avgPlace != null ? { value: m.avgPlace, label: 'Recent avg' } : undefined
+            }
+          />
         </div>
       </div>
     )
@@ -219,18 +335,22 @@ export function AnalyzePanelBody({
     if (!hasRiderResults) return <NoResults />
     const makes = snapshot.bikeMake.podiumByMake
     return (
-      <div className="space-y-2">
+      <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
         <p className="text-sm text-zinc-400">
           Your make:{' '}
           <span className="font-semibold text-white">{snapshot.bikeMake.riderMake ?? '—'}</span>
         </p>
         {makes.length ? (
-          <SimpleBarChart
-            horizontal
-            categories={makes.map((row) => row.make)}
-            values={makes.map((row) => row.count)}
-            color="#a1a1aa"
-          />
+          <div className="min-h-0 flex-1">
+            <SimpleBarChart
+              horizontal
+              categories={makes.map((row) => row.make)}
+              values={makes.map((row) => row.count)}
+              color="#a1a1aa"
+              height={220}
+              className="h-full w-full"
+            />
+          </div>
         ) : (
           <NoResults />
         )}
@@ -240,7 +360,11 @@ export function AnalyzePanelBody({
 
   if (panelId === 'headToHead') {
     if (!hasRiderResults) return <NoResults />
-    const yMax = Math.max(5, ...h2h.rider, ...h2h.rival)
+    const placeValues = [...h2h.rider, ...h2h.rival].filter(
+      (n) => Number.isFinite(n) && n > 0,
+    )
+    const dataMax = placeValues.length ? Math.max(...placeValues) : 5
+    const yMax = dataMax * 1.1
     return (
       <div className="space-y-3">
         <label className="block text-xs uppercase tracking-wide text-zinc-400">
@@ -260,19 +384,238 @@ export function AnalyzePanelBody({
           </select>
         </label>
         {h2h.rivalName ? (
-          <SimpleLineChart
-            categories={h2h.labels}
-            series={[
-              { name: 'You', data: h2h.rider, color: '#38bdf8' },
-              { name: h2h.rivalName, data: h2h.rival, color: '#fbbf24' },
-            ]}
-            invertY
-            yMin={1}
-            yMax={yMax}
-          />
+          <div className="space-y-2">
+            <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-300">
+              <li className="flex items-center gap-1.5">
+                <span className="inline-block h-0.5 w-4 bg-[#38bdf8]" aria-hidden />
+                You
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="inline-block h-0.5 w-4 bg-[#fbbf24]" aria-hidden />
+                {h2h.rivalName}
+              </li>
+              <li className="text-zinc-500">Lower place is better</li>
+            </ul>
+            <SimpleLineChart
+              categories={h2h.labels}
+              series={[
+                { name: 'You', data: h2h.rider, color: '#38bdf8' },
+                { name: h2h.rivalName, data: h2h.rival, color: '#fbbf24' },
+              ]}
+              invertY
+              yMin={1}
+              yMax={yMax}
+            />
+          </div>
         ) : (
           <NoResults />
         )}
+      </div>
+    )
+  }
+
+  if (panelId === 'lastRaceBreakdown') {
+    if (!hasRiderResults || !snapshot.lastRaceBreakdown) return <NoResults />
+    const last = snapshot.lastRaceBreakdown
+    const motoBars = (
+      [
+        { label: 'Moto 1', value: last.race1, color: '#38bdf8' },
+        { label: 'Moto 2', value: last.race2, color: '#fbbf24' },
+        { label: 'Moto 3', value: last.race3, color: '#4ade80' },
+      ] as const
+    ).filter(
+      (row): row is { label: string; value: number; color: string } =>
+        row.value != null && row.value > 0,
+    )
+    return (
+      <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
+        <p className="truncate text-xs text-zinc-500">{last.eventName}</p>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="border border-white/10 px-2 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Place</p>
+            <p className="text-lg font-bold leading-tight text-[#f5c518]">{fmt(last.place, 0)}</p>
+          </div>
+          <div className="border border-white/10 px-2 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Points</p>
+            <p className="text-lg font-bold leading-tight">{last.points}</p>
+          </div>
+          <div className="border border-white/10 px-2 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Field</p>
+            <p className="text-lg font-bold leading-tight">{last.fieldSize}</p>
+          </div>
+        </div>
+        {motoBars.length ? (
+          <div className="min-h-0 flex-1">
+            <SimpleBarChart
+              categories={motoBars.map((row) => row.label)}
+              values={motoBars.map((row) => row.value)}
+              colors={motoBars.map((row) => row.color)}
+              height={180}
+              className="h-full w-full"
+              showYAxis
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-500">
+            Class avg place: {fmt(last.classAvgPlace)}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  if (panelId === 'gapToNeighbors') {
+    if (!snapshot.gapToNeighbors || snapshot.gapToNeighbors.window.length === 0) {
+      return <NoResults />
+    }
+    const gap = snapshot.gapToNeighbors
+    const ahead = [...gap.window].reverse().find((row) => row.gapFromYou > 0) ?? null
+    const behind = gap.window.find((row) => row.gapFromYou < 0) ?? null
+    const neighborColors = ['#38bdf8', '#fbbf24', '#a78bfa', '#f472b6', '#fb923c', '#22d3ee']
+    let neighborColorIndex = 0
+    const pointBars = gap.window.map((row) => ({
+      label: row.isYou ? 'You' : row.name,
+      value: row.points,
+      color: row.isYou
+        ? '#4ade80'
+        : neighborColors[neighborColorIndex++ % neighborColors.length]!,
+    }))
+    return (
+      <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
+        <p className="text-xs text-zinc-500">
+          Rank #{gap.youRank} · {gap.youPoints} pts
+          {ahead ? ` · ${ahead.gapFromYou} behind ${ahead.name}` : ' · leading'}
+          {behind ? ` · ${Math.abs(behind.gapFromYou)} ahead of ${behind.name}` : ''}
+        </p>
+        <div className="min-h-0 flex-1">
+          <SimpleBarChart
+            categories={pointBars.map((row) => row.label)}
+            values={pointBars.map((row) => row.value)}
+            colors={pointBars.map((row) => row.color)}
+            height={220}
+            className="h-full w-full"
+            showYAxis
+            verticalLabels
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (panelId === 'motoSpread') {
+    if (!hasRiderResults || !snapshot.motoSpread) return <NoResults />
+    const spread = snapshot.motoSpread
+    const motoBars = (
+      [
+        { label: 'Moto 1', value: spread.race1, color: '#38bdf8' },
+        { label: 'Moto 2', value: spread.race2, color: '#fbbf24' },
+        { label: 'Moto 3', value: spread.race3, color: '#4ade80' },
+      ] as const
+    ).filter(
+      (row): row is { label: string; value: number; color: string } =>
+        row.value != null && row.value > 0,
+    )
+    if (motoBars.length === 0) return <NoResults />
+    return (
+      <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="truncate text-xs text-zinc-500">{spread.eventName}</p>
+          <p className="shrink-0 text-sm font-semibold text-[#f5c518]">
+            Spread {spread.spread == null ? '—' : spread.spread}
+          </p>
+        </div>
+        <div className="min-h-0 flex-1">
+          <SimpleBarChart
+            categories={motoBars.map((row) => row.label)}
+            values={motoBars.map((row) => row.value)}
+            colors={motoBars.map((row) => row.color)}
+            height={220}
+            className="h-full w-full"
+            showYAxis
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (panelId === 'pointsLeftOnTable') {
+    if (!hasRiderResults || !snapshot.pointsLeftOnTable) return <NoResults />
+    const left = snapshot.pointsLeftOnTable
+    return (
+      <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
+        <p className="truncate text-xs text-zinc-500">{left.eventName}</p>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="border border-white/10 px-2 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">You</p>
+            <p className="text-lg font-bold leading-tight text-[#38bdf8]">{left.yourPoints}</p>
+          </div>
+          <div className="border border-white/10 px-2 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Winner</p>
+            <p className="text-lg font-bold leading-tight text-[#fbbf24]">{left.winnerPoints}</p>
+          </div>
+          <div className="border border-white/10 px-2 py-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Left</p>
+            <p className="text-lg font-bold leading-tight text-[#f87171]">{left.left}</p>
+          </div>
+        </div>
+        {left.winnerName ? (
+          <p className="text-xs text-zinc-500">Winner: {left.winnerName}</p>
+        ) : null}
+        <div className="min-h-0 flex-1">
+          <SimpleBarChart
+            categories={['You', 'Winner']}
+            values={[left.yourPoints, left.winnerPoints]}
+            colors={['#38bdf8', '#fbbf24']}
+            height={180}
+            className="h-full w-full"
+            showYAxis
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (panelId === 'roundCompare') {
+    if (!hasRiderResults || !snapshot.roundCompare || snapshot.roundCompare.rounds.length < 2) {
+      return <NoResults />
+    }
+    const rounds = snapshot.roundCompare.rounds
+    const placeValues = rounds
+      .map((round) => round.place)
+      .filter((n): n is number => n != null && n > 0)
+    return (
+      <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-300">
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 bg-[#38bdf8]" aria-hidden />
+            Place
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 bg-[#fbbf24]" aria-hidden />
+            Points
+          </li>
+        </ul>
+        <div className="min-h-0 flex-1 space-y-2">
+          <SimpleBarChart
+            categories={rounds.map((round) => round.label)}
+            values={rounds.map((round) => round.place ?? 0)}
+            colors={['#38bdf8', '#818cf8']}
+            height={120}
+            className="h-auto w-full"
+            showYAxis
+          />
+          <SimpleBarChart
+            categories={rounds.map((round) => round.label)}
+            values={rounds.map((round) => round.points)}
+            colors={['#fbbf24', '#f59e0b']}
+            height={120}
+            className="h-auto w-full"
+            showYAxis
+          />
+        </div>
+        {placeValues.length === 0 ? (
+          <p className="text-sm text-zinc-500">No place data for comparison.</p>
+        ) : null}
       </div>
     )
   }

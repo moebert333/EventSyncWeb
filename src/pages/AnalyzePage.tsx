@@ -65,8 +65,15 @@ export function AnalyzePage() {
     : 'Rider'
 
   const aiData = useMemo(
-    () => snapshotForAi(snapshot, seriesName, riderLabel),
-    [snapshot, seriesName, riderLabel],
+    () =>
+      snapshotForAi(
+        snapshot,
+        seriesName,
+        riderLabel,
+        analyzeQuery.data?.events ?? [],
+        analyzeQuery.data?.rows ?? [],
+      ),
+    [snapshot, seriesName, riderLabel, analyzeQuery.data?.events, analyzeQuery.data?.rows],
   )
 
   const loading = seriesQuery.isLoading || analyzeQuery.isLoading
@@ -99,7 +106,11 @@ export function AnalyzePage() {
         <Skeleton rows={8} />
       ) : (
         <>
-          <AnalyzeAiSection data={aiData} enabled={participantId != null} />
+          <AnalyzeAiSection
+            data={aiData}
+            enabled={(analyzeQuery.data?.rows.length ?? 0) > 0}
+            earlySeries={snapshot.summary.eventsRun <= 2}
+          />
           {participantId == null ? (
             <p className="text-sm text-zinc-400">Select a rider to populate analysis panels.</p>
           ) : (

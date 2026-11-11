@@ -10,6 +10,16 @@ import type { EntryParticipant, EventClassResult, EventPointsRow, EventRow } fro
 const RESULT_COLUMNS =
   'event_id, event_name, class_id, class_name, overall_place, participant_id, first_name, last_name, participant_plate, make, overall_points, race1_place, race2_place, race3_place, semi1_place, semi2_place, lcq_place, finals_place'
 
+/** VITE_DASHBOARD_MAX_EVENTS: positive int caps series events (earliest by date). Unset = all. */
+export function dashboardMaxEventsFromEnv(
+  value: string | undefined = import.meta.env.VITE_DASHBOARD_MAX_EVENTS,
+): number | null {
+  if (value == null || value.trim() === '') return null
+  const parsed = Number.parseInt(value.trim(), 10)
+  if (!Number.isFinite(parsed) || parsed < 1) return null
+  return parsed
+}
+
 export type SeriesAnalyzePayload = {
   events: EventRow[]
   rows: EventClassResult[]
@@ -17,8 +27,9 @@ export type SeriesAnalyzePayload = {
 }
 
 export function useSeriesAnalyzeData(seriesId: number | null) {
+  const maxEvents = dashboardMaxEventsFromEnv()
   return useQuery({
-    queryKey: ['series-analyze', seriesId],
+    queryKey: ['series-analyze', seriesId, maxEvents],
     enabled: seriesId != null,
     queryFn: async (): Promise<SeriesAnalyzePayload> => {
       const { data: eventData, error: eventError } = await supabase
@@ -27,7 +38,9 @@ export function useSeriesAnalyzeData(seriesId: number | null) {
         .eq('series_id', seriesId!)
         .order('date', { ascending: true })
       if (eventError) throw eventError
-      const events = (eventData ?? []) as EventRow[]
+      const allEvents = (eventData ?? []) as EventRow[]
+      const events =
+        maxEvents != null ? allEvents.slice(0, maxEvents) : allEvents
       const eventIds = events.map((event) => event.event_id)
       if (eventIds.length === 0) return { events, rows: [], riders: [] }
 

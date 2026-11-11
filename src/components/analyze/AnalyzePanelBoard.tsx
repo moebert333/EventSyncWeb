@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AnalyzeSnapshot } from '../../lib/analyzeMetrics'
 import {
+  analyzeLayoutBand,
+  defaultPanelIdsForEventsRun,
   loadAnalyzePanelLayout,
   panelDef,
   saveAnalyzePanelLayout,
@@ -19,11 +21,16 @@ type Props = {
   focusClassName: string | null
 }
 
+function initialPanelOrder(eventsRun: number): AnalyzePanelId[] {
+  const loaded = loadAnalyzePanelLayout(eventsRun)
+  return loaded.custom === true ? loaded.order : defaultPanelIdsForEventsRun(eventsRun)
+}
+
 export function AnalyzePanelBoard({ snapshot, rows, focusClassName }: Props) {
-  const [order, setOrder] = useState<AnalyzePanelId[]>(() => loadAnalyzePanelLayout().order)
-  const [collapsed, setCollapsed] = useState<Set<AnalyzePanelId>>(
-    () => new Set(loadAnalyzePanelLayout().collapsed),
-  )
+  const eventsRun = snapshot.summary.eventsRun
+  const band = analyzeLayoutBand(eventsRun)
+  const [order, setOrder] = useState<AnalyzePanelId[]>(() => initialPanelOrder(eventsRun))
+  const [custom, setCustom] = useState(() => loadAnalyzePanelLayout(eventsRun).custom === true)
   const [standingsClassOverride, setStandingsClassOverride] = useState<string | null>(null)
   const [swapFor, setSwapFor] = useState<AnalyzePanelId | null>(null)
   const [draggingId, setDraggingId] = useState<AnalyzePanelId | null>(null)
@@ -31,6 +38,7 @@ export function AnalyzePanelBoard({ snapshot, rows, focusClassName }: Props) {
   const longPressOrigin = useRef<{ x: number; y: number } | null>(null)
   const touchDragId = useRef<AnalyzePanelId | null>(null)
   const prevFocusClass = useRef(focusClassName)
+  const prevBand = useRef(band)
 
   // When header class changes, re-default Standings to that class (local override only).
   useEffect(() => {
@@ -40,6 +48,19 @@ export function AnalyzePanelBoard({ snapshot, rows, focusClassName }: Props) {
     }
   }, [focusClassName])
 
+  // Separate early (≤2) vs full (3+) layouts so a full-series custom order cannot stick.
+  useEffect(() => {
+    if (prevBand.current === band) {
+      if (custom) return
+      setOrder(defaultPanelIdsForEventsRun(eventsRun))
+      return
+    }
+    prevBand.current = band
+    const loaded = loadAnalyzePanelLayout(eventsRun)
+    setCustom(loaded.custom === true)
+    setOrder(loaded.custom === true ? loaded.order : defaultPanelIdsForEventsRun(eventsRun))
+  }, [band, eventsRun, custom])
+
   const standingsClass =
     standingsClassOverride && snapshot.classNames.includes(standingsClassOverride)
       ? standingsClassOverride
@@ -48,20 +69,16 @@ export function AnalyzePanelBoard({ snapshot, rows, focusClassName }: Props) {
         : (snapshot.classNames[0] ?? null)
 
   useEffect(() => {
-    saveAnalyzePanelLayout({ order, collapsed: [...collapsed] })
-  }, [order, collapsed])
+    saveAnalyzePanelLayout({ order, collapsed: [], custom }, eventsRun)
+  }, [order, custom, eventsRun])
 
-  function toggleCollapsed(id: AnalyzePanelId) {
-    setCollapsed((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  function markCustom() {
+    setCustom(true)
   }
 
   function reorder(fromId: AnalyzePanelId, toId: AnalyzePanelId) {
     if (fromId === toId) return
+    markCustom()
     setOrder((prev) => {
       const next = [...prev]
       const from = next.indexOf(fromId)
@@ -74,12 +91,8 @@ export function AnalyzePanelBoard({ snapshot, rows, focusClassName }: Props) {
   }
 
   function swapPanel(slotId: AnalyzePanelId, replacement: AnalyzePanelId) {
+    markCustom()
     setOrder((prev) => prev.map((id) => (id === slotId ? replacement : id)))
-    setCollapsed((prev) => {
-      const next = new Set(prev)
-      next.delete(slotId)
-      return next
-    })
     setSwapFor(null)
   }
 
@@ -105,7 +118,6 @@ export function AnalyzePanelBoard({ snapshot, rows, focusClassName }: Props) {
       <div className="grid grid-cols-1 gap-3 min-[640px]:grid-cols-2 min-[1024px]:grid-cols-3">
         {order.map((id) => {
           const def = panelDef(id)
-          const isCollapsed = collapsed.has(id)
           const isDragging = draggingId === id
           return (
             <article
@@ -173,50 +185,34 @@ export function AnalyzePanelBoard({ snapshot, rows, focusClassName }: Props) {
               data-panel-id={id}
             >
               <header className="flex items-center gap-1 border-b border-white/10 px-2 py-1.5">
-                <button
-                  type="button"
-                  className="inline-flex min-h-10 min-w-10 items-center justify-center text-zinc-400 hover:text-white"
-                  aria-expanded={!isCollapsed}
-                  title={isCollapsed ? 'Expand panel' : 'Collapse panel'}
-                  onClick={() => toggleCollapsed(id)}
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                    {isCollapsed ? (
-                      <path fill="currentColor" d="M9 6.5 15.5 12 9 17.5V6.5Z" />
-                    ) : (
-                      <path fill="currentColor" d="M6.5 9 12 15.5 17.5 9H6.5Z" />
-                    )}
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 cursor-grab touch-manipulation text-left text-sm font-semibold uppercase tracking-wide text-zinc-200 active:cursor-grabbing"
+                <span
+                  className="min-w-0 flex-1 cursor-grab touch-manipulation truncate px-2 text-left text-sm font-semibold uppercase tracking-wide text-zinc-200 active:cursor-grabbing"
                   title="Drag to reorder"
-                  onClick={() => toggleCollapsed(id)}
                 >
                   {def.title}
-                </button>
+                </span>
                 <button
                   type="button"
-                  className="shrink-0 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#f5c518] hover:bg-white/5"
+                  className="inline-flex shrink-0 items-center gap-1 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#f5c518] hover:bg-white/5"
                   title="Select a different panel"
                   onClick={() => setSwapFor(id)}
                 >
                   Select
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                    <path fill="currentColor" d="M6.5 9 12 15.5 17.5 9H6.5Z" />
+                  </svg>
                 </button>
               </header>
-              {!isCollapsed ? (
-                <div className="min-h-[260px] flex-1 p-3">
-                  <AnalyzePanelBody
-                    panelId={id}
-                    snapshot={snapshot}
-                    rows={rows}
-                    focusClassName={focusClassName}
-                    standingsClass={standingsClass}
-                    onStandingsClassChange={setStandingsClassOverride}
-                  />
-                </div>
-              ) : null}
+              <div className="flex min-h-[280px] flex-1 flex-col p-3">
+                <AnalyzePanelBody
+                  panelId={id}
+                  snapshot={snapshot}
+                  rows={rows}
+                  focusClassName={focusClassName}
+                  standingsClass={standingsClass}
+                  onStandingsClassChange={setStandingsClassOverride}
+                />
+              </div>
             </article>
           )
         })}

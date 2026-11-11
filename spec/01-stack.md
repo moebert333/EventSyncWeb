@@ -28,8 +28,8 @@ VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_REQUIRE_ALL_MOTOS=false
 # Server-only (never VITE_): Vite /api/analyze proxy for Analyze AI (Groq).
 GROQ_API_KEY=
-# Optional; default openai/gpt-oss-120b (llama-3.3-70b-versatile retired on free/dev tiers).
-# GROQ_MODEL=openai/gpt-oss-120b
+# Optional; default openai/gpt-oss-20b (lower cost). Prefer Groq Developer tier for full-series TPM.
+# GROQ_MODEL=openai/gpt-oss-20b
 # Optional production override (e.g. Supabase Edge Function URL). Default: /api/analyze
 # VITE_ANALYZE_API_URL=
 ```

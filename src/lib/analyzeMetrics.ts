@@ -29,6 +29,12 @@ export type StandingRow = {
   isYou: boolean
 }
 
+export type FinishDistributionSlice = {
+  label: string
+  value: number
+  color: string
+}
+
 export type AnalyzeSnapshot = {
   /** Focus class used for summary + most panels (selected in Dashboard header). */
   riderClassName: string | null
@@ -43,10 +49,12 @@ export type AnalyzeSnapshot = {
     seriesPoints: number
     eventsRaced: number
     eventsInSeries: number
+    /** Distinct events in the series that already have scored results. */
+    eventsRun: number
     gapToLeader: number | null
   }
   placeOverTime: { labels: string[]; rider: number[]; classAvg: number[]; seasonAvg: number | null }
-  finishDistribution: { wins: number; podium: number; other: number }
+  finishDistribution: FinishDistributionSlice[]
   pointsAccumulation: { labels: string[]; rider: number[]; leader: number[] }
   motoAverages: { moto1: number | null; moto2: number | null; moto3: number | null }
   recentMomentum: {
@@ -54,10 +62,59 @@ export type AnalyzeSnapshot = {
     avgPlace: number | null
     ptsVsLeader: number | null
     improving: boolean | null
+    /** Percent place improvement vs earlier rounds (positive = better / lower place). */
+    placeChangePct: number | null
   }
   reliability: { dns: number; dnf: number; dsq: number; finishRate: number | null }
   bikeMake: { riderMake: string | null; podiumByMake: { make: string; count: number }[] }
   headToHeadOptions: { participantId: number; name: string }[]
+  lastRaceBreakdown: {
+    eventName: string
+    place: number | null
+    points: number
+    race1: number | null
+    race2: number | null
+    race3: number | null
+    fieldSize: number
+    classAvgPlace: number | null
+  } | null
+  gapToNeighbors: {
+    youRank: number
+    youPoints: number
+    /** Up to 2 riders above, you, and up to 2 below (scored standings order). */
+    window: {
+      rank: number
+      name: string
+      points: number
+      /** Points vs you: positive = ahead, negative = behind, 0 = you. */
+      gapFromYou: number
+      isYou: boolean
+    }[]
+  } | null
+  motoSpread: {
+    eventName: string
+    race1: number | null
+    race2: number | null
+    race3: number | null
+    spread: number | null
+  } | null
+  pointsLeftOnTable: {
+    eventName: string
+    yourPoints: number
+    winnerPoints: number
+    left: number
+    winnerName: string | null
+  } | null
+  roundCompare: {
+    rounds: {
+      label: string
+      place: number | null
+      points: number
+      race1: number | null
+      race2: number | null
+      race3: number | null
+    }[]
+  } | null
 }
 
 function numericPlace(value: string | number | null | undefined): number | null {
@@ -71,6 +128,113 @@ function statusFromPlace(value: string | number | null | undefined): string | nu
   const upper = String(value).trim().toUpperCase()
   if (upper === 'DNS' || upper === 'DNF' || upper === 'DSQ' || upper === 'DNS/DNF') return upper
   return null
+}
+
+function ordinalPlace(place: number): string {
+  const mod100 = place % 100
+  const mod10 = place % 10
+  if (mod100 >= 11 && mod100 <= 13) return `${place}th`
+  if (mod10 === 1) return `${place}st`
+  if (mod10 === 2) return `${place}nd`
+  if (mod10 === 3) return `${place}rd`
+  return `${place}th`
+}
+
+/** Distinct palette so adjacent mid/back-pack finishes stay visible on the pie. */
+const FINISH_SLICE_COLORS = [
+  '#38bdf8',
+  '#818cf8',
+  '#34d399',
+  '#fb7185',
+  '#f59e0b',
+  '#64748b',
+  '#a78bfa',
+  '#52525b',
+]
+
+function colorForSlice(index: number, place: number): string {
+  if (place === 1) return '#f5c518'
+  return FINISH_SLICE_COLORS[index % FINISH_SLICE_COLORS.length]!
+}
+
+/** Prefer classic wins/podium/4th+ buckets; expand by place when that would under-slice. */
+export function buildFinishDistribution(riderResults: RiderEventResult[]): FinishDistributionSlice[] {
+  const total = riderResults.length
+  if (total === 0) return []
+
+  const minWanted = total >= 3 ? 3 : total >= 2 ? 2 : 1
+  const placeCounts = new Map<number, number>()
+  let noPlace = 0
+  for (const result of riderResults) {
+    if (result.overallPlace == null) {
+      noPlace += 1
+      continue
+    }
+    placeCounts.set(result.overallPlace, (placeCounts.get(result.overallPlace) ?? 0) + 1)
+  }
+
+  const wins = placeCounts.get(1) ?? 0
+  const podium = (placeCounts.get(2) ?? 0) + (placeCounts.get(3) ?? 0)
+  const other =
+    [...placeCounts.entries()]
+      .filter(([place]) => place >= 4)
+      .reduce((sum, [, count]) => sum + count, 0) + noPlace
+  const classic: FinishDistributionSlice[] = [
+    { label: 'Wins (1st)', value: wins, color: '#f5c518' },
+    { label: 'Podium (2–3)', value: podium, color: '#38bdf8' },
+    { label: '4th+', value: other, color: '#52525b' },
+  ]
+  const classicActive = classic.filter((slice) => slice.value > 0).length
+  if (classicActive >= minWanted) return classic
+
+  type PlaceGroup = { min: number; max: number; count: number }
+  const groups: PlaceGroup[] = [...placeCounts.keys()]
+    .sort((a, b) => a - b)
+    .map((place) => ({ min: place, max: place, count: placeCounts.get(place)! }))
+
+  const maxSlices = 3
+  while (groups.length + (noPlace > 0 ? 1 : 0) > maxSlices && groups.length > 1) {
+    let bestIndex = 0
+    let bestGap = Infinity
+    for (let i = 0; i < groups.length - 1; i++) {
+      const gap = groups[i + 1]!.min - groups[i]!.max
+      if (gap < bestGap) {
+        bestGap = gap
+        bestIndex = i
+      }
+    }
+    const left = groups[bestIndex]!
+    const right = groups[bestIndex + 1]!
+    groups.splice(bestIndex, 2, {
+      min: left.min,
+      max: right.max,
+      count: left.count + right.count,
+    })
+  }
+
+  // If still over the cap because of a trailing "No place" bucket, fold it into the last range.
+  if (noPlace > 0 && groups.length >= maxSlices) {
+    const last = groups[groups.length - 1]!
+    last.count += noPlace
+    noPlace = 0
+  }
+
+  const slices: FinishDistributionSlice[] = groups.map((group, index) => ({
+    label:
+      group.min === group.max
+        ? ordinalPlace(group.min)
+        : `${ordinalPlace(group.min)}–${ordinalPlace(group.max)}`,
+    value: group.count,
+    color: colorForSlice(index, group.min),
+  }))
+  if (noPlace > 0 && slices.length < maxSlices) {
+    slices.push({
+      label: 'No place',
+      value: noPlace,
+      color: colorForSlice(slices.length, 99),
+    })
+  }
+  return slices.slice(0, maxSlices)
 }
 
 function shortEventLabel(event: SeriesEventRef, index: number): string {
@@ -242,11 +406,7 @@ export function buildAnalyzeSnapshot(
     leaderCumSeries.push(leaderCum)
   }
 
-  const wins = riderResults.filter((result) => result.overallPlace === 1).length
-  const podium = riderResults.filter(
-    (result) => result.overallPlace != null && result.overallPlace >= 2 && result.overallPlace <= 3,
-  ).length
-  const other = riderResults.length - wins - podium
+  const finishDistribution = buildFinishDistribution(riderResults)
 
   const moto1 = avg(riderResults.map((result) => result.race1).filter((n): n is number => n != null))
   const moto2 = avg(riderResults.map((result) => result.race2).filter((n): n is number => n != null))
@@ -305,6 +465,96 @@ export function buildAnalyzeSnapshot(
     .slice(0, 12)
     .map((row) => ({ participantId: row.participantId, name: row.name }))
 
+  const eventsRun = new Set(rows.map((row) => row.event_id)).size
+  const lastResult = riderResults.length ? riderResults[riderResults.length - 1]! : null
+
+  let lastRaceBreakdown: AnalyzeSnapshot['lastRaceBreakdown'] = null
+  let motoSpread: AnalyzeSnapshot['motoSpread'] = null
+  let pointsLeftOnTable: AnalyzeSnapshot['pointsLeftOnTable'] = null
+  if (lastResult) {
+    const fieldRows = rows.filter(
+      (row) =>
+        row.event_id === lastResult.eventId && row.class_name === lastResult.className,
+    )
+    const fieldPlaces = fieldRows
+      .map((row) => numericPlace(row.overall_place))
+      .filter((n): n is number => n != null)
+    lastRaceBreakdown = {
+      eventName: lastResult.eventName,
+      place: lastResult.overallPlace,
+      points: lastResult.overallPoints,
+      race1: lastResult.race1,
+      race2: lastResult.race2,
+      race3: lastResult.race3,
+      fieldSize: fieldRows.length,
+      classAvgPlace: avg(fieldPlaces),
+    }
+    const motoValues = [lastResult.race1, lastResult.race2, lastResult.race3].filter(
+      (n): n is number => n != null,
+    )
+    motoSpread = {
+      eventName: lastResult.eventName,
+      race1: lastResult.race1,
+      race2: lastResult.race2,
+      race3: lastResult.race3,
+      spread: motoValues.length >= 2 ? Math.max(...motoValues) - Math.min(...motoValues) : null,
+    }
+    const winnerRow = [...fieldRows]
+      .map((row) => ({
+        name: riderName(row.first_name, row.last_name),
+        points: row.overall_points ?? 0,
+        place: numericPlace(row.overall_place) ?? 999,
+      }))
+      .sort((a, b) => b.points - a.points || a.place - b.place)[0]
+    const winnerPoints = winnerRow?.points ?? lastResult.overallPoints
+    pointsLeftOnTable = {
+      eventName: lastResult.eventName,
+      yourPoints: lastResult.overallPoints,
+      winnerPoints,
+      left: Math.max(0, winnerPoints - lastResult.overallPoints),
+      winnerName: winnerRow?.name ?? null,
+    }
+  }
+
+  let gapToNeighbors: AnalyzeSnapshot['gapToNeighbors'] = null
+  const scoredFocusStandings = focusStandings.filter((row) => row.points > 0)
+  const youInScored = scoredFocusStandings.find((row) => row.isYou) ?? null
+  if (youInScored) {
+    const youIdx = scoredFocusStandings.indexOf(youInScored)
+    const youRank = youIdx + 1
+    const start = Math.max(0, youIdx - 2)
+    const end = Math.min(scoredFocusStandings.length, youIdx + 3)
+    gapToNeighbors = {
+      youRank,
+      youPoints: youInScored.points,
+      window: scoredFocusStandings.slice(start, end).map((row, offset) => {
+        const rank = start + offset + 1
+        return {
+          rank,
+          name: row.name,
+          points: row.points,
+          gapFromYou: row.points - youInScored.points,
+          isYou: row.isYou,
+        }
+      }),
+    }
+  }
+
+  const compareSource = riderResults.slice(0, 2)
+  const roundCompare: AnalyzeSnapshot['roundCompare'] =
+    compareSource.length >= 1
+      ? {
+          rounds: compareSource.map((result, index) => ({
+            label: labels[index] ?? `Rd ${index + 1}`,
+            place: result.overallPlace,
+            points: result.overallPoints,
+            race1: result.race1,
+            race2: result.race2,
+            race3: result.race3,
+          })),
+        }
+      : null
+
   return {
     riderClassName,
     riderClassNames,
@@ -316,6 +566,7 @@ export function buildAnalyzeSnapshot(
       seriesPoints: youStanding?.points ?? 0,
       eventsRaced: youStanding?.events ?? riderResults.length,
       eventsInSeries: orderedEvents.length,
+      eventsRun,
       gapToLeader:
         youStanding && leader ? leader.points - youStanding.points : null,
     },
@@ -325,7 +576,7 @@ export function buildAnalyzeSnapshot(
       classAvg: classAvgPlaces,
       seasonAvg,
     },
-    finishDistribution: { wins, podium, other },
+    finishDistribution,
     pointsAccumulation: { labels, rider: riderCumSeries, leader: leaderCumSeries },
     motoAverages: { moto1, moto2, moto3 },
     recentMomentum: {
@@ -334,6 +585,10 @@ export function buildAnalyzeSnapshot(
       ptsVsLeader: lastN > 0 ? recentRiderPts - recentLeaderPts : null,
       improving:
         earlyAvg != null && recentAvg != null ? recentAvg < earlyAvg : null,
+      placeChangePct:
+        earlyAvg != null && recentAvg != null && earlyAvg > 0
+          ? ((earlyAvg - recentAvg) / earlyAvg) * 100
+          : null,
     },
     reliability: { dns, dnf, dsq, finishRate },
     bikeMake: {
@@ -343,6 +598,11 @@ export function buildAnalyzeSnapshot(
         .sort((a, b) => b.count - a.count),
     },
     headToHeadOptions,
+    lastRaceBreakdown,
+    gapToNeighbors,
+    motoSpread,
+    pointsLeftOnTable,
+    roundCompare,
   }
 }
 
@@ -368,36 +628,134 @@ export function headToHeadPlaces(
   return { labels, rider, rival, rivalName }
 }
 
-/** Compact JSON for Groq — keep tokens low. */
-export function snapshotForAi(snapshot: AnalyzeSnapshot, seriesName: string, riderLabel: string) {
+/**
+ * Compact JSON for Analyze AI — full series places/points + focus rider detail.
+ * `seriesResults` rows: `[eventIdx, classIdx, riderIdx, place|null, points]`.
+ * Motos live on focusRider.results only (keeps series payload smaller).
+ * `focusRider.standings` is the full focus-class table (needed for “closest to” Qs).
+ */
+export function snapshotForAi(
+  snapshot: AnalyzeSnapshot,
+  seriesName: string,
+  riderLabel: string,
+  events: SeriesEventRef[] = [],
+  rows: EventClassResult[] = [],
+) {
+  const focusClass = snapshot.riderClassName
+  const eventList = events.length
+    ? events
+    : snapshot.riderResults.map((result) => ({
+        event_id: result.eventId,
+        name: result.eventName,
+        date: result.eventDate,
+      }))
+
+  const eventIndex = new Map<number, number>()
+  const eventCatalog = eventList.map((event, index) => {
+    eventIndex.set(event.event_id, index)
+    return { n: event.name, d: event.date }
+  })
+
+  const classNames = [
+    ...new Set(
+      (rows.length ? rows.map((row) => row.class_name) : snapshot.classNames).filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b))
+  const classIndex = new Map(classNames.map((name, index) => [name, index]))
+
+  const riderById = new Map<number, { i: number; n: string; p: string | null }>()
+  const sourceRows =
+    rows.length > 0
+      ? rows
+      : snapshot.riderResults.map(
+          (result) =>
+            ({
+              event_id: result.eventId,
+              event_name: result.eventName,
+              class_id: result.classId,
+              class_name: result.className,
+              overall_place: result.overallPlace,
+              participant_id: -1,
+              first_name: riderLabel,
+              last_name: '',
+              participant_plate: null,
+              make: result.make,
+              overall_points: result.overallPoints,
+              race1_place: result.race1,
+              race2_place: result.race2,
+              race3_place: result.race3,
+              semi1_place: null,
+              semi2_place: null,
+              lcq_place: null,
+              finals_place: null,
+            }) satisfies EventClassResult,
+        )
+
+  for (const row of sourceRows) {
+    if (riderById.has(row.participant_id)) continue
+    riderById.set(row.participant_id, {
+      i: riderById.size,
+      n: riderName(row.first_name, row.last_name),
+      p: row.participant_plate,
+    })
+  }
+  const riderCatalog = [...riderById.values()].map(({ n, p }) => (p ? [n, p] : [n]))
+
+  const seriesResults: (number | null)[][] = []
+  for (const row of sourceRows) {
+    const eIdx = eventIndex.get(row.event_id)
+    const cIdx = classIndex.get(row.class_name)
+    const rIdx = riderById.get(row.participant_id)?.i
+    if (eIdx == null || cIdx == null || rIdx == null) continue
+    seriesResults.push([
+      eIdx,
+      cIdx,
+      rIdx,
+      numericPlace(row.overall_place),
+      row.overall_points ?? 0,
+    ])
+  }
+
   return {
     seriesName,
-    rider: riderLabel,
-    class: snapshot.riderClassName,
-    summary: snapshot.summary,
-    results: snapshot.riderResults.map((result) => ({
-      event: result.eventName,
-      date: result.eventDate,
-      place: result.overallPlace,
-      points: result.overallPoints,
-      moto: [result.race1, result.race2, result.race3],
-      status: result.statusLabel,
-    })),
-    standingsTop: (snapshot.riderClassName
-      ? snapshot.standingsByClass[snapshot.riderClassName] ?? []
-      : []
-    )
-      .slice(0, 8)
-      .map((row, index) => ({
-        rank: index + 1,
-        name: row.name,
-        points: row.points,
-        events: row.events,
-        avgPlace: row.avgPlace,
-        isYou: row.isYou,
+    focusClass,
+    schema: {
+      riders: '[name] or [name, plate]',
+      seriesResults: '[eventIdx, classIdx, riderIdx, place, points]',
+      standings: 'focusClass series table [{r,n,pts,ev,avg,you?}] — use for closest/gap questions',
+      note: 'Default scope is focusRider + focusClass unless another class/series-wide ask is clear. Motos are on focusRider.results only. For standings proximity, use focusRider.standings (full class), not a top-N guess.',
+    },
+    events: eventCatalog,
+    classes: classNames,
+    riders: riderCatalog,
+    seriesResults,
+    focusRider: {
+      name: riderLabel,
+      class: focusClass,
+      summary: snapshot.summary,
+      results: snapshot.riderResults.map((result) => ({
+        e: result.eventName,
+        pl: result.overallPlace,
+        pts: result.overallPoints,
+        m: [result.race1, result.race2, result.race3],
+        st: result.statusLabel,
       })),
-    motoAverages: snapshot.motoAverages,
-    recentMomentum: snapshot.recentMomentum,
-    finishDistribution: snapshot.finishDistribution,
+      standings: (focusClass ? snapshot.standingsByClass[focusClass] ?? [] : []).map(
+        (row, index) => ({
+          r: index + 1,
+          n: row.name,
+          pts: row.points,
+          ev: row.events,
+          avg: row.avgPlace,
+          you: row.isYou || undefined,
+        }),
+      ),
+      motoAvg: snapshot.motoAverages,
+      lastRace: snapshot.lastRaceBreakdown,
+      gapToNeighbors: snapshot.gapToNeighbors,
+      motoSpread: snapshot.motoSpread,
+      pointsLeft: snapshot.pointsLeftOnTable,
+      roundCompare: snapshot.roundCompare,
+    },
   }
 }

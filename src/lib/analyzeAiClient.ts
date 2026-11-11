@@ -10,9 +10,11 @@ export type AnalyzeAiChartSpec = {
 export type AnalyzeAiResponse = {
   answer: string
   chart?: AnalyzeAiChartSpec | null
+  /** False when the model could not answer from the provided series data. */
+  canAnswer?: boolean
 }
 
-const DAILY_LIMIT = 30
+const DAILY_LIMIT = 20
 const USAGE_KEY = 'eventsync.analyzeAiUsage'
 
 function usageToday(): { day: string; count: number } {
@@ -65,8 +67,15 @@ export async function askAnalyzeAi(input: {
 
   bumpUsage()
   const row = (payload ?? {}) as Record<string, unknown>
+  const canAnswer = row.canAnswer !== false
   return {
-    answer: typeof row.answer === 'string' ? row.answer : 'No answer returned.',
-    chart: (row.chart as AnalyzeAiChartSpec | null | undefined) ?? null,
+    canAnswer,
+    answer:
+      typeof row.answer === 'string'
+        ? row.answer
+        : canAnswer
+          ? 'No answer returned.'
+          : 'Not enough data in this series selection to answer that.',
+    chart: canAnswer ? ((row.chart as AnalyzeAiChartSpec | null | undefined) ?? null) : null,
   }
 }
