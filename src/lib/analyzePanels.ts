@@ -99,7 +99,7 @@ export const ANALYZE_PANEL_CATALOG: AnalyzePanelDef[] = [
 export const DEFAULT_ANALYZE_PANEL_IDS: AnalyzePanelId[] = [
   'placeOverTime',
   'recentMomentum',
-  'finishDistribution',
+  'headToHead',
   'seriesStandings',
   'pointsAccumulation',
   'motoConsistency',
@@ -109,7 +109,7 @@ export const DEFAULT_ANALYZE_PANEL_IDS: AnalyzePanelId[] = [
 export const EARLY_DEFAULT_ANALYZE_PANEL_IDS: AnalyzePanelId[] = [
   'lastRaceBreakdown',
   'gapToNeighbors',
-  'motoSpread',
+  'headToHead',
   'pointsLeftOnTable',
   'seriesStandings',
   'roundCompare',

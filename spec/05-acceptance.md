@@ -118,7 +118,7 @@ Shared phase behavior:
 - [ ] Can only be started on Active Race (`/live`); Ctrl+click / long-press off that page explains to go to Active Race
 - [ ] Ctrl+click or long-press (~1.8s) EventSync brand opens the simulation dialog; normal click / short tap still goes Home
 - [ ] Dialog lists current-event **races only** (no practices); requires Event Code context
-- [ ] Approx. lap time defaults to 5s; valid range 2–120s with validation / clamp
+- [ ] Approx. lap time defaults to `SIMULATE_SECS`; valid range 2–120s with validation / clamp
 - [ ] Ok starts client-only loop for the **chosen race only** (Staging → Active → Finished → restart)
 - [ ] At Staging/start, each entrant has a lap-0 zero/empty timing row until the first lap is recorded
 - [ ] Live page shows simulated timing with realistic place / lap-time variation; prior lap rows stay frozen
@@ -169,9 +169,11 @@ Shared phase behavior:
 - [ ] “Analyze your Data with AI” section near top; collapses; suggested prompts + Ask
 - [ ] AI uses `/api/analyze` or `VITE_ANALYZE_API_URL`; `GROQ_API_KEY` never in client bundle
 - [ ] AI answers grounded in series snapshot JSON; optional chart render
-- [ ] Six default panels: place over time, finish distribution, series standings, points accumulation, moto consistency, Recent Momentum
+- [ ] Six default panels; 3rd is always Head-to-head (full and early event-count bands)
+- [ ] Full defaults: place over time, Recent Momentum, Head-to-head, series standings, points accumulation, moto consistency
+- [ ] Early defaults (≤2 events): last race breakdown, gap to neighbors, Head-to-head, points left on table, series standings, round compare
 - [ ] Panels collapse, share similar expanded min-height, drag-reorder (mouse + mobile long-press), Select to unused catalog panels
-- [ ] Catalog also includes reliability, bike make vs class, head-to-head
+- [ ] Catalog also includes finish distribution, reliability, bike make vs class, and other non-default panels
 - [ ] Series standings panel has class selector for any class in the series
 - [ ] Panel layout persists (`eventsync.analyzePanelLayout`)
 - [ ] Column count follows viewport/container width breakpoints

@@ -30,5 +30,5 @@ Executable build specs for the EventSync Vite + React + TypeScript + Supabase PW
 - PWA: app shell offline, live timing network-only
 - Admin URL hidden from public nav
 - **Demo mode** (`event_codes.demo`): auto continuous client-only sim (Staging → Active → Finished loop; races 5–10 or fallback); local race-order / staging overlay; never writes timing DB; Header manual start hidden
-- **Manual simulation** (non-demo only; Ctrl+click / long-press brand on `/live`): same phase loop for one chosen race; leave `/live` confirms cancel; Pause / Continue / Stop; lap 2–120s (default 5); never writes timing DB
+- **Manual simulation** (non-demo only; Ctrl+click / long-press brand on `/live`): same phase loop for one chosen race; leave `/live` confirms cancel; Pause / Continue / Stop; lap 2–120s (default `SIMULATE_SECS`); never writes timing DB
 - **Moto Challenge sample seed**: `scripts/seed-moto-challenge.ps1` regenerates and loads org `MX Racing Inc` / series `Moto Challenge 2027` (codes `ESYNC-DEMO-1`…`5`, all `demo=true`; live on `ESYNC-DEMO-4`); wipe only that org; Postgres URI required (not API keys)

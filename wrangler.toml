@@ -18,4 +18,7 @@ run_worker_first = ["/api/*"]
 
 [vars]
 XAI_MODEL = "grok-4.3"
+# Client simulation timing (also set in .env.local for Vite builds; baked at build time).
+SIMULATE_SECS = "10"
+SIMULATE_LAPS = "8"
 

@@ -13,4 +13,8 @@ interface ImportMetaEnv {
   readonly VITE_DASHBOARD_MAX_EVENTS?: string
   /** Optional override for Analyze AI proxy (default `/api/analyze`). */
   readonly VITE_ANALYZE_API_URL?: string
+  /** Injected from SIMULATE_SECS (wrangler.toml / .env) via vite.config define. */
+  readonly VITE_SIMULATE_SECS?: string
+  /** Injected from SIMULATE_LAPS (wrangler.toml / .env) via vite.config define. */
+  readonly VITE_SIMULATE_LAPS?: string
 }

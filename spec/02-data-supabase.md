@@ -72,7 +72,7 @@ Client-only simulation (`03-ui.md` §3b) may **read** entrants via `active_race_
 - Resolve path selects `event_codes.demo`. When `demo` is true, the client auto-starts a continuous simulation after Event Code resolve.
 - While simulating, `/live` hooks serve in-memory rows shaped like `race_in_progress` / `active_race_timing` instead of polling those views for that event.
 - **Demo mode** also applies a **local** overlay on the race-order query result (`active` / `completed` / `status`) so Race Order, Warning text, and Staging alerts follow the simulated race. Results pages still read real `event_class_results` / DB only (no fabricated results).
-- Constants (client): `SIMULATE_SECS` (Staging + Finished hold), `SIMULATE_LAPS` / `MAX_SIMULATION_LAPS` (laps before Finished), `SIMULATE_LAP_SEC` (demo base lap seconds).
+- Constants (client): `SIMULATE_SECS` (Staging + Finished hold and default base lap seconds), `SIMULATE_LAPS` / `MAX_SIMULATION_LAPS` (laps before Finished). Set in `wrangler.toml` `[vars]` and `.env` / `.env.local` (same names as `XAI_MODEL`); Vite bakes them into the SPA at build time.
 
 ## Schema additions required for this website
 

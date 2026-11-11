@@ -4,7 +4,6 @@ import { useEventCode } from '../hooks/useEventCode'
 import { useEventRaceOrder } from '../hooks/useEventRaceOrder'
 import {
   MAX_SIMULATION_LAPS,
-  SIMULATE_LAP_SEC,
   SIMULATE_LAPS,
   SIMULATE_SECS,
   selectDemoRaces,
@@ -50,7 +49,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const demoIndexRef = useRef(0)
   const completedDemoIdsRef = useRef<number[]>([])
   const manualRaceRef = useRef<EventRaceOrderRow | null>(null)
-  const manualBaseLapSecRef = useRef(SIMULATE_LAP_SEC)
+  const manualBaseLapSecRef = useRef(SIMULATE_SECS)
   const phaseRef = useRef<SimPhase>('staging')
   const phaseStartedAtRef = useRef(0)
   const phaseElapsedOffsetRef = useRef(0)
@@ -227,7 +226,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       setStarting(true)
       setError(null)
       const ok = await startRaceEngine(nextRace, {
-        baseLapSec: SIMULATE_LAP_SEC,
+        baseLapSec: SIMULATE_SECS,
         maxLaps: SIMULATE_LAPS,
         demo: true,
       })
@@ -241,7 +240,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
           tried.add(candidate.race_id)
           demoIndexRef.current = idx
           const retry = await startRaceEngine(candidate, {
-            baseLapSec: SIMULATE_LAP_SEC,
+            baseLapSec: SIMULATE_SECS,
             maxLaps: SIMULATE_LAPS,
             demo: true,
           })
@@ -276,7 +275,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
           const race = selected[i]!
           demoIndexRef.current = i
           const ok = await startRaceEngine(race, {
-            baseLapSec: SIMULATE_LAP_SEC,
+            baseLapSec: SIMULATE_SECS,
             maxLaps: SIMULATE_LAPS,
             demo: true,
           })

@@ -1,13 +1,20 @@
 import type { EventRaceOrderRow, RaceStatus } from '../types/database'
 
-/** Hold time (seconds) for Staging and Finished phases. */
-export const SIMULATE_SECS = 5
-/** Laps each rider must complete before the race moves to Finished (demo loop). */
-export const SIMULATE_LAPS = 8
+function envPositiveInt(raw: string | undefined, fallback: number): number {
+  const n = raw != null && raw !== '' ? Number.parseInt(raw, 10) : Number.NaN
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+/**
+ * Hold time (seconds) for Staging and Finished phases, and default base lap
+ * duration for the lap engine (demo + manual dialog default).
+ * From `SIMULATE_SECS` in wrangler.toml / .env (injected at Vite build).
+ */
+export const SIMULATE_SECS = envPositiveInt(import.meta.env.VITE_SIMULATE_SECS, 10)
+/** Laps each rider must complete before Finished (demo loop). From `SIMULATE_LAPS`. */
+export const SIMULATE_LAPS = envPositiveInt(import.meta.env.VITE_SIMULATE_LAPS, 8)
 /** Laps each rider must complete before Finished (manual Active Race simulation). */
 export const MAX_SIMULATION_LAPS = SIMULATE_LAPS
-/** Base lap duration (seconds) for the existing lap engine. */
-export const SIMULATE_LAP_SEC = 5
 
 export type RaceOrderOverlay = {
   /** Competitive races included in the current demo loop. */

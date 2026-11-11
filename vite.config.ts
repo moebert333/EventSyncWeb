@@ -7,6 +7,11 @@ import { xaiAnalyzePlugin } from './scripts/xaiAnalyzePlugin.ts'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
+    // Mirror wrangler.toml [vars] / .env SIMULATE_* into the client bundle at build time.
+    define: {
+      'import.meta.env.VITE_SIMULATE_SECS': JSON.stringify(env.SIMULATE_SECS ?? '10'),
+      'import.meta.env.VITE_SIMULATE_LAPS': JSON.stringify(env.SIMULATE_LAPS ?? '8'),
+    },
     plugins: [
       react(),
       tailwindcss(),

@@ -3,16 +3,16 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import { useEventCode } from '../hooks/useEventCode'
 import { useEventRaceOrder } from '../hooks/useEventRaceOrder'
+import { SIMULATE_SECS } from '../lib/demoSimulation'
 import { formatRaceTitle } from '../lib/format'
 import { useSimulation } from '../lib/simulationContext'
 
-const DEFAULT_LAP_SEC = 5
 const MIN_LAP_SEC = 2
 const MAX_LAP_SEC = 120
 const LIVE_PATH = '/live'
 
 function clampLapSec(value: number): number {
-  if (!Number.isFinite(value)) return DEFAULT_LAP_SEC
+  if (!Number.isFinite(value)) return SIMULATE_SECS
   return Math.min(MAX_LAP_SEC, Math.max(MIN_LAP_SEC, Math.round(value)))
 }
 
@@ -24,7 +24,7 @@ export function SimulationDialog() {
   const racesQuery = useEventRaceOrder(context?.eventId ?? null)
   const races = (racesQuery.data ?? []).filter((race) => !race.is_practice)
   const [raceId, setRaceId] = useState<number | ''>('')
-  const [lapSec, setLapSec] = useState(DEFAULT_LAP_SEC)
+  const [lapSec, setLapSec] = useState(SIMULATE_SECS)
   const [lapError, setLapError] = useState<string | null>(null)
   const canConfigure = onLivePage && Boolean(context)
 
