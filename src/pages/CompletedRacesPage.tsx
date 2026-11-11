@@ -514,7 +514,7 @@ export function CompletedRacesPage() {
   let selectedResultsLabel: string | null = null
   if (scope === 'series' && seriesRequest) {
     if (seriesRequest.className) {
-      selectedResultsLabel = `${seriesRequest.className} · Series standings`
+      selectedResultsLabel = seriesRequest.className
     } else if (seriesRequest.participantId != null) {
       const rider =
         seriesRiders.find((row) => row.participant_id === seriesRequest.participantId) ??
@@ -528,10 +528,7 @@ export function CompletedRacesPage() {
       if (rider) {
         selectedResultsLabel =
           riderName(rider.first_name, rider.last_name) +
-          (rider.participant_plate ? ` · ${rider.participant_plate}` : '') +
-          ' · Series standings'
-      } else {
-        selectedResultsLabel = 'Series standings'
+          (rider.participant_plate ? ` · ${rider.participant_plate}` : '')
       }
     }
   } else if (request?.className) {
@@ -614,7 +611,9 @@ export function CompletedRacesPage() {
       ) : null}
 
       {!loading && !loadError ? (
-        <section className={`panel !bg-[#2a2a2a] ${selectOpen ? '!py-2' : '!py-1.5'}`}>
+        <section
+          className={`panel !bg-[#2a2a2a] !px-3 ${selectOpen ? '!py-2' : '!py-1.5'}`}
+        >
           <div
             role="button"
             tabIndex={0}
@@ -631,7 +630,7 @@ export function CompletedRacesPage() {
             }}
           >
             <span className="min-w-0 flex-1 truncate text-base font-bold">
-              Selected Results:{' '}
+              {scope === 'series' && seriesRequest ? 'Series Standings:' : 'Selected Results:'}{' '}
               {selectedResultsLabel ? (
                 <span className="font-bold text-[#22a05a]">{selectedResultsLabel}</span>
               ) : null}
@@ -661,12 +660,12 @@ export function CompletedRacesPage() {
               </p>
 
               <div
-                className="flex flex-wrap items-center gap-x-4 gap-y-1"
+                className="flex flex-wrap items-center gap-x-2 gap-y-1"
                 role="radiogroup"
                 aria-label="Show"
               >
                 <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-400">Show</span>
-                <label className="inline-flex items-center gap-2" title="Show single-event results">
+                <label className="inline-flex items-center gap-1.5" title="Show single-event results">
                   <input
                     type="radio"
                     name="results-scope"
@@ -675,7 +674,10 @@ export function CompletedRacesPage() {
                   />
                   Event results
                 </label>
-                <label className="inline-flex items-center gap-2" title="Show series championship standings">
+                <label
+                  className="inline-flex items-center gap-1.5"
+                  title="Show series championship standings"
+                >
                   <input
                     type="radio"
                     name="results-scope"
