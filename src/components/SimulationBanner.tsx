@@ -1,9 +1,16 @@
+import {
+  toggleEventHeaderCollapsed,
+  useEventHeaderCollapsed,
+} from '../lib/eventHeaderCollapse'
 import { formatRaceTitle } from '../lib/format'
 import { useSimulation } from '../lib/simulationContext'
 
 export function SimulationBanner() {
   const { isActive, isPaused, isDemoMode, raceInProgress, pause, resume, stop } = useSimulation()
+  const [headerCollapsed] = useEventHeaderCollapsed()
+  // Demo banner follows the Event/Rider strip collapse; manual sim banner stays visible.
   if (!isActive || !raceInProgress) return null
+  if (isDemoMode && headerCollapsed) return null
 
   const title = formatRaceTitle(
     raceInProgress.race_num,
@@ -13,13 +20,17 @@ export function SimulationBanner() {
   const statusLabel = raceInProgress.status ? ` · ${raceInProgress.status}` : ''
 
   return (
-    <div className="border-b border-[#f5c518]/40 bg-[#f5c518]/15">
+    <div
+      className={`border-b border-[#f5c518]/40 bg-[#f5c518]/15${isDemoMode ? ' cursor-pointer' : ''}`}
+      title={isDemoMode ? 'Hide Event, Rider, and Demo banner' : undefined}
+      onClick={isDemoMode ? () => toggleEventHeaderCollapsed() : undefined}
+    >
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-2">
         <p className="text-sm font-semibold uppercase tracking-wide text-[#f5c518]">
           {isDemoMode ? 'Demo' : 'Simulation'}
           {isPaused ? ' · Paused' : statusLabel} · {title}
         </p>
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div className="ml-auto flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
           {isPaused ? (
             <button
               type="button"
