@@ -252,9 +252,9 @@ export function AnalyzeContextHeader({
 
   return (
     <>
-      <div className="-mx-4 -mt-6 border-b border-[#f5c518]/35 bg-[#252525] px-4 py-3 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-base">
-          <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+      <div className="-mx-4 -mt-6 border-b border-[#f5c518]/35 bg-[#252525] px-2.5 py-2 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-base">
+          <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1">
             <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-500">Series</span>
             <button
               type="button"
@@ -265,7 +265,7 @@ export function AnalyzeContextHeader({
               {shortLinkLabel(seriesFull)}
             </button>
           </span>
-          <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+          <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1">
             <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-500">Rider</span>
             <button
               type="button"
@@ -276,7 +276,7 @@ export function AnalyzeContextHeader({
               {shortLinkLabel(participantFull)}
             </button>
           </span>
-          <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+          <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1">
             <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-500">Class</span>
             <button
               type="button"
@@ -290,20 +290,20 @@ export function AnalyzeContextHeader({
           </span>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-4">
-          <div className="inline-flex w-auto items-baseline gap-2 border border-white/10 bg-[#1a1a1a] px-3 py-2">
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <div className="inline-flex w-auto items-baseline gap-1.5 border border-white/10 bg-[#1a1a1a] px-2 py-1">
             <span className="text-sm uppercase tracking-wide text-zinc-400">Standing</span>
             <span className="font-display text-2xl font-bold leading-none text-white">
               {summary.seriesRank != null ? `${summary.seriesRank}` : '—'}
             </span>
           </div>
-          <div className="inline-flex w-auto items-baseline gap-2 border border-white/10 bg-[#1a1a1a] px-3 py-2">
+          <div className="inline-flex w-auto items-baseline gap-1.5 border border-white/10 bg-[#1a1a1a] px-2 py-1">
             <span className="text-sm uppercase tracking-wide text-zinc-400">Points</span>
             <span className="font-display text-2xl font-bold leading-none text-white">
               {summary.seriesPoints}
             </span>
           </div>
-          <div className="inline-flex w-auto items-baseline gap-2 border border-white/10 bg-[#1a1a1a] px-3 py-2">
+          <div className="inline-flex w-auto items-baseline gap-1.5 border border-white/10 bg-[#1a1a1a] px-2 py-1">
             <span className="text-sm uppercase tracking-wide text-zinc-400">Events</span>
             <span className="font-display text-2xl font-bold leading-none text-white">
               {summary.eventsRaced}/{summary.eventsInSeries || '—'}
