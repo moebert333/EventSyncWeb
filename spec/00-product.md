@@ -26,9 +26,12 @@ EventSync is a public website and installable PWA for racers and spectators at a
 7. Install the site on a phone home screen and reopen it without signing in (public pages).
 8. An allowlisted organizer signs in with a magic link and creates/edits organization, series, events, and Event Codes.
 
-## Simulation mode (demo / development)
+## Simulation (client-only; never writes timing DB)
 
-Hidden client-only mode for demonstrating Active Race without a live track feed. Started from the public header (Ctrl+click the EventSync brand). It synthesizes `race_in_progress` / `active_race_timing`-shaped data in memory for a chosen event race so `/live` behaves as if a race were running. It must **never** write timing, status, or race rows to Supabase. Full UI rules: `03-ui.md` (Simulation mode).
+Two modes; both synthesize `race_in_progress` / `active_race_timing`-shaped data in memory and must **never** write timing, status, or race rows to Supabase. Full UI rules: `03-ui.md` §3b.
+
+1. **Demo mode** — when `event_codes.demo` is true for the resolved Event Code: continuous background loop (prefer competitive races 5–10; else 1–5 / available). Local race-order overlay drives Active / completed / Staging alerts and Warning text. Manual Header start is hidden.
+2. **Manual simulation** — non-demo events only: Ctrl+click / long-press brand on Active Race (`/live`) opens a dialog; loops Staging → Active → Finished for the **chosen race only** while the user stays on `/live`.
 
 ## Non-goals (this spec)
 

@@ -1,4 +1,4 @@
-import type { ActiveRaceTiming, EventRaceOrderRow, RaceInProgress } from '../types/database'
+import type { ActiveRaceTiming, EventRaceOrderRow, RaceInProgress, RaceStatus } from '../types/database'
 import type { StoredEventContext } from './eventContext'
 import { secondsToRaceTime } from './format'
 import { supabase } from './supabase'
@@ -39,6 +39,13 @@ export type RaceSimulation = {
   pause: (nowMs: number) => RaceSimulationSnapshot
   resume: (nowMs: number) => RaceSimulationSnapshot
   isPaused: () => boolean
+  getStatus: () => RaceStatus
+  /** Staging → Active; starts the lap clock. */
+  beginActive: (nowMs: number) => RaceSimulationSnapshot
+  /** Freeze as Finished. */
+  finish: (nowMs: number) => RaceSimulationSnapshot
+  /** True when every rider has reached maxLaps (if configured). */
+  allLapsComplete: () => boolean
 }
 
 type ParticipantViewRow = {
@@ -166,6 +173,7 @@ function buildRaceHeader(
   context: StoredEventContext,
   race: EventRaceOrderRow,
   elapsedRaceTime: string,
+  status: RaceStatus,
 ): RaceInProgress {
   return {
     race_num: race.race_num,
@@ -180,7 +188,7 @@ function buildRaceHeader(
     race_start: null,
     description: null,
     elapsed_race_time: elapsedRaceTime,
-    status: 'Active',
+    status,
   }
 }
 
@@ -290,8 +298,13 @@ export function createRaceSimulation(options: {
   participants: SimParticipantSeed[]
   baseLapSec: number
   startedAtMs: number
+  /** When set, stop generating laps once every rider reaches this count. */
+  maxLaps?: number | null
+  /** Initial race status. Manual sims default to Active; demo starts Staging. */
+  initialStatus?: RaceStatus
 }): RaceSimulation {
   const baseLapSec = clamp(options.baseLapSec, 2, 120)
+  const maxLaps = options.maxLaps == null || options.maxLaps <= 0 ? null : options.maxLaps
   const meta = {
     event_id: options.context.eventId,
     event_name: options.context.eventName,
@@ -321,19 +334,28 @@ export function createRaceSimulation(options: {
   })
 
   let timingRows: ActiveRaceTiming[] = options.participants.map((seed) => emptyTimingRow(seed, meta))
-  let race = buildRaceHeader(options.context, options.race, secondsToRaceTime(0, false))
+  let status: RaceStatus = options.initialStatus ?? 'Active'
+  let race = buildRaceHeader(options.context, options.race, secondsToRaceTime(0, false), status)
   /** Elapsed race seconds accumulated before the current running segment. */
   let elapsedOffsetSec = 0
-  /** Wall-clock start of the current running segment. */
+  /** Wall-clock start of the current running segment (Active only). */
   let runningFromMs = options.startedAtMs
   let paused = false
+  /** Status before pause (Staging stays Staging visually while the hold timer freezes). */
+  let statusBeforePause: RaceStatus | null = null
 
   function raceElapsedAt(nowMs: number): number {
+    if (status === 'Staging' || status === 'Finished') return elapsedOffsetSec
     if (paused) return elapsedOffsetSec
     return Math.max(0, elapsedOffsetSec + (nowMs - runningFromMs) / 1000)
   }
 
+  function riderDone(rider: RiderState): boolean {
+    return maxLaps != null && rider.currentLapNum >= maxLaps
+  }
+
   function completeLap(rider: RiderState, atSec: number) {
+    if (riderDone(rider)) return
     const lapTime = rider.pendingLapTime
     rider.currentLapNum += 1
     rider.lastCrossingAt = atSec
@@ -344,18 +366,24 @@ export function createRaceSimulation(options: {
       rider.bestLapSec = lapTime
       rider.bestLapNum = rider.currentLapNum
     }
-    const next = planLapSeconds(baseLapSec, rider.skill)
-    rider.pendingLapTime = next
-    rider.nextLapAt = atSec + next
+    if (riderDone(rider)) {
+      // No more laps planned for this rider.
+      rider.nextLapAt = Number.POSITIVE_INFINITY
+    } else {
+      const next = planLapSeconds(baseLapSec, rider.skill)
+      rider.pendingLapTime = next
+      rider.nextLapAt = atSec + next
+    }
     // Append a new frozen row; never rewrite earlier laps.
     timingRows = [...timingRows, timingRowForCrossing(rider, riders, meta)]
   }
 
-  function applyElapsed(raceElapsedSec: number, status: 'Active' | 'Paused'): RaceSimulationSnapshot {
-    if (status === 'Active') {
+  function applyElapsed(raceElapsedSec: number, nextStatus: RaceStatus): RaceSimulationSnapshot {
+    if (nextStatus === 'Active') {
       for (;;) {
         let nextRider: RiderState | null = null
         for (const rider of riders) {
+          if (riderDone(rider)) continue
           if (rider.nextLapAt > raceElapsedSec) continue
           if (!nextRider || rider.nextLapAt < nextRider.nextLapAt) nextRider = rider
         }
@@ -364,36 +392,87 @@ export function createRaceSimulation(options: {
       }
     }
 
+    status = nextStatus
     race = {
       ...race,
       elapsed_race_time: secondsToRaceTime(raceElapsedSec, false),
-      status,
+      status: nextStatus,
     }
     return { race, timingRows }
   }
 
   function tick(nowMs: number): RaceSimulationSnapshot {
     if (paused) return { race, timingRows }
+    if (status === 'Staging' || status === 'Finished') return { race, timingRows }
     return applyElapsed(raceElapsedAt(nowMs), 'Active')
   }
 
   function pause(nowMs: number): RaceSimulationSnapshot {
     if (paused) return { race, timingRows }
-    elapsedOffsetSec = raceElapsedAt(nowMs)
+    if (status === 'Finished') return { race, timingRows }
+    if (status === 'Active') {
+      elapsedOffsetSec = raceElapsedAt(nowMs)
+    }
+    statusBeforePause = status
     paused = true
-    return applyElapsed(elapsedOffsetSec, 'Paused')
+    // Keep Staging as Staging so staging alerts stay correct; Active becomes Paused.
+    if (status === 'Active') {
+      return applyElapsed(elapsedOffsetSec, 'Paused')
+    }
+    return { race, timingRows }
   }
 
   function resume(nowMs: number): RaceSimulationSnapshot {
     if (!paused) return { race, timingRows }
-    runningFromMs = nowMs
     paused = false
-    return applyElapsed(raceElapsedAt(nowMs), 'Active')
+    const restore = statusBeforePause ?? 'Active'
+    statusBeforePause = null
+    if (restore === 'Active' || restore === 'Paused') {
+      runningFromMs = nowMs
+      return applyElapsed(raceElapsedAt(nowMs), 'Active')
+    }
+    status = restore
+    race = { ...race, status: restore }
+    return { race, timingRows }
+  }
+
+  function beginActive(nowMs: number): RaceSimulationSnapshot {
+    if (status !== 'Staging' && status !== 'Paused') return { race, timingRows }
+    paused = false
+    statusBeforePause = null
+    elapsedOffsetSec = 0
+    runningFromMs = nowMs
+    return applyElapsed(0, 'Active')
+  }
+
+  function finish(nowMs: number): RaceSimulationSnapshot {
+    if (!paused && status === 'Active') {
+      elapsedOffsetSec = raceElapsedAt(nowMs)
+    }
+    paused = false
+    statusBeforePause = null
+    return applyElapsed(elapsedOffsetSec, 'Finished')
   }
 
   function getSnapshot(): RaceSimulationSnapshot {
     return { race, timingRows }
   }
 
-  return { tick, getSnapshot, pause, resume, isPaused: () => paused }
+  function allLapsComplete(): boolean {
+    if (maxLaps == null) return false
+    if (riders.length === 0) return true
+    return riders.every((rider) => rider.currentLapNum >= maxLaps)
+  }
+
+  return {
+    tick,
+    getSnapshot,
+    pause,
+    resume,
+    isPaused: () => paused,
+    getStatus: () => status,
+    beginActive,
+    finish,
+    allLapsComplete,
+  }
 }

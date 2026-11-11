@@ -154,8 +154,8 @@ Production-like check: `npm run build` && `npm run preview` or `npx serve dist -
 
 On valid code:
 
-- Resolve `event_codes.code` → `event_id` → `events` → `series` → `organization`.
-- Persist `{ organizationId, seriesId, eventId, code }`.
+- Resolve `event_codes.code` (+ `demo`) → `event_id` → `events` → `series` → `organization`.
+- Persist `{ organizationId, seriesId, eventId, code, demo, … }` in `eventsync.eventContext`.
 - Invalid / unknown code: stay on Home, show error, do not clear a previously valid context unless user explicitly changes code.
 
 ## Build phases (implementation order)

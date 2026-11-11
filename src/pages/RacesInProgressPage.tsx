@@ -274,6 +274,8 @@ export function RacesInProgressPage() {
   const { context, selectedParticipant } = useEventCode()
   const simulation = useSimulationOptional()
   const simulating = Boolean(simulation?.isActive)
+  // Demo keeps next-race / warning strip; manual single-race sim still hides it.
+  const showParticipantHeader = !simulating || Boolean(simulation?.isDemoMode)
   if (simulating && !lastSeenSimulatingForAutoChart) {
     autoChartSimGen += 1
   }
@@ -530,7 +532,7 @@ export function RacesInProgressPage() {
   if (raceQuery.isLoading) {
     return (
       <div className="space-y-5">
-        {!simulating ? (
+        {showParticipantHeader ? (
           <EventParticipantHeader
             eventId={context.eventId}
             eventName={context.eventName}
@@ -548,7 +550,7 @@ export function RacesInProgressPage() {
   if (raceQuery.error) {
     return (
       <div className="space-y-5">
-        {!simulating ? (
+        {showParticipantHeader ? (
           <EventParticipantHeader
             eventId={context.eventId}
             eventName={context.eventName}
@@ -577,7 +579,7 @@ export function RacesInProgressPage() {
   if (!race) {
     return (
       <div className="space-y-5">
-        {!simulating ? (
+        {showParticipantHeader ? (
           <EventParticipantHeader
             eventId={context.eventId}
             eventName={context.eventName}
@@ -737,7 +739,7 @@ export function RacesInProgressPage() {
 
   return (
     <div className="space-y-5">
-      {!simulating ? (
+      {showParticipantHeader ? (
         <EventParticipantHeader
           eventId={context.eventId}
           eventName={race.event_name || context.eventName}

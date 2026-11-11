@@ -448,11 +448,11 @@ def generate_sql(rng: random.Random) -> str:
         plan = EventPlan(
             index=i,
             event_id=EVENT_ID_BASE + i,
-            name=f"{track}-{month} Event",
+            name=f"{track}-{month}",
             track=track,
             location=location,
             event_date=event_date,
-            code=f"MX-2027-{i}",
+            code=f"ESYNC-DEMO-{i}",
         )
         for class_name, _ in CLASS_SPECS:
             plan.class_ids[class_name] = class_id
@@ -504,8 +504,9 @@ def generate_sql(rng: random.Random) -> str:
     lines.append(",\n".join(event_values) + ";")
     lines.append("")
 
-    code_values = [f"({ev.event_id}, {sql_str(ev.code)})" for ev in events]
-    lines.append("insert into public.event_codes (event_id, code) values")
+    # All Moto Challenge sample codes are continuous client-side demos (event_codes.demo).
+    code_values = [f"({ev.event_id}, {sql_str(ev.code)}, true)" for ev in events]
+    lines.append("insert into public.event_codes (event_id, code, demo) values")
     lines.append(",\n".join(code_values) + ";")
     lines.append("")
 

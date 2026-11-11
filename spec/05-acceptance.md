@@ -95,20 +95,37 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] A newly detected race while the page is open closes the chart and opens the status video (when available)
 - [ ] Scoped to Event Code’s event (or series fallback as in data spec)
 
-## F2. Simulation mode
+## F2. Simulation (client-only; no timing DB writes)
 
-- [ ] Simulation can only be started on Active Race (`/live`); Ctrl+click / long-press off that page explains to go to Active Race
+Shared phase behavior:
+
+- [ ] Staging (lap-0 / empty timing) holds `SIMULATE_SECS`, then Active; Active until lap cap, then Finished; Finished holds `SIMULATE_SECS` before advancing
+- [ ] Pause freezes Staging/Finished holds and Active lap generation; Continue resumes without counting paused wall time
+- [ ] No inserts/updates to `active_timing` / `status` / `races`; Results stay real DB data
+
+### Demo mode (`event_codes.demo`)
+
+- [ ] Resolving a demo Event Code auto-starts continuous simulation without visiting `/live`
+- [ ] Header Ctrl+click / long-press simulation entry is disabled
+- [ ] Race set prefers competitive 5–10; else 1–5; else available competitive races; wraps and resets local completed flags
+- [ ] Race Order shows simulated race as active; Warning text / Staging alerts follow simulated active race
+- [ ] Event strip shows yellow `DEMO MODE` (mobile) or `DEMO MODE - {name}` (desktop); tooltip = full event name
+- [ ] Banner is Demo with Pause / Continue only (no Stop); leaving `/live` does not cancel the loop
+- [ ] `/live` keeps EventParticipantHeader so next-race / warning strip follows the sim
+
+### Manual simulation (non-demo)
+
+- [ ] Can only be started on Active Race (`/live`); Ctrl+click / long-press off that page explains to go to Active Race
 - [ ] Ctrl+click or long-press (~1.8s) EventSync brand opens the simulation dialog; normal click / short tap still goes Home
 - [ ] Dialog lists current-event **races only** (no practices); requires Event Code context
-- [ ] Approx. lap time defaults to 15s; valid range 2–120s with validation / clamp
-- [ ] Ok starts client-only simulation on `/live` and does **not** write `active_timing` / status / races
-- [ ] At start, each entrant has a lap-0 zero/empty timing row until the first lap is recorded
+- [ ] Approx. lap time defaults to 5s; valid range 2–120s with validation / clamp
+- [ ] Ok starts client-only loop for the **chosen race only** (Staging → Active → Finished → restart)
+- [ ] At Staging/start, each entrant has a lap-0 zero/empty timing row until the first lap is recorded
 - [ ] Live page shows simulated timing with realistic place / lap-time variation; prior lap rows stay frozen
 - [ ] While simulating, Simulation banner is shown and the Active Race participant header strip is hidden
-- [ ] Banner shows Pause / Continue / Stop; Pause freezes clock and crossings (status Paused); Continue resumes from the same elapsed
+- [ ] Banner shows Pause / Continue / Stop; Stop (banner or dialog) returns `/live` to real Supabase data
 - [ ] Leaving `/live` while simulating prompts “Simulation will be Cancelled” with Ok (stop + navigate) / Cancel (stay)
-- [ ] Stop (banner or dialog) returns `/live` to real Supabase data and restores the Active Race header
-- [ ] Race Order / Results / Staging alerts are unaffected by simulation DB writes (none occur)
+- [ ] Race Order / Staging alerts stay on real DB data (no manual overlay)
 
 ## G. Completed Races
 
@@ -194,13 +211,13 @@ PWA after Home + Admin work, not before Event Code resolution.
 - [ ] `scripts/generate_moto_challenge_seed.py` regenerates `supabase/seed_moto_challenge_2027.sql` with a new random dataset each run (optional `--seed` for reproducibility)
 - [ ] `scripts/seed-moto-challenge.ps1` generates SQL then applies it using `SUPABASE_DIRECT_CONNECT_STRING` / `SUPABASE_DB_URL` / `SUPABASE_DB_PASSWORD` (not API keys)
 - [ ] Apply wipes only `org_key = mx-racing-inc` and reloads that org
-- [ ] Org `MX Racing Inc`, series `Moto Challenge 2027`, five 2027 events, codes `MX-2027-1`…`MX-2027-5`
+- [ ] Org `MX Racing Inc`, series `Moto Challenge 2027`, five 2027 events, codes `ESYNC-DEMO-1`…`ESYNC-DEMO-5` (all `demo=true`)
 - [ ] ~150 riders, ~10 classes, same class rosters across events; ~2 motos/class; 5 combined (2-class) races
 - [ ] Events 1–3 have full `event_results`; Event 4 has races 1–10 completed, race 11 active with ≥5 `active_timing` laps; Event 5 has schedule/entries only
 - [ ] `admin_allowlist` includes the configured developer email for that org
-- [ ] Site smoke: Event Code `MX-2027-4` shows live timing; `MX-2027-1`…`3` show results; `MX-2027-5` has no completed results yet
+- [ ] Site smoke: Event Code `ESYNC-DEMO-4` shows live timing; `ESYNC-DEMO-1`…`3` show results; `ESYNC-DEMO-5` has no completed results yet
 
 ## Suggested test Event Codes
 
-- Minimal: `DEMO01AB` (`supabase/seed.sql`) → one org, one live race, one completed event with results.
-- Realistic: `MX-2027-1`…`MX-2027-5` (Moto Challenge sample; live on `MX-2027-4`).
+- Minimal: `DEMO01AB` (`supabase/seed.sql`, `demo=true`) → one org, one live race, one completed event with results; enters Demo mode.
+- Realistic: `ESYNC-DEMO-1`…`ESYNC-DEMO-5` (Moto Challenge sample, all `demo=true`; DB live sample on `ESYNC-DEMO-4`).

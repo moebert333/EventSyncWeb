@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useEventCode } from '../hooks/useEventCode'
 import { useSimulationOptional } from '../lib/simulationContext'
 
 const links = [
@@ -36,7 +37,9 @@ const bannerLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Header() {
   const location = useLocation()
+  const { context } = useEventCode()
   const simulation = useSimulationOptional()
+  const demoEvent = Boolean(context?.demo)
   const [menuPath, setMenuPath] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(links.length)
   const open = menuPath === location.pathname
@@ -136,7 +139,7 @@ export function Header() {
   }
 
   function openSimulationFromBrand(event: { preventDefault: () => void; stopPropagation: () => void }) {
-    if (!simulation) return
+    if (!simulation || demoEvent) return
     event.preventDefault()
     event.stopPropagation()
     suppressBrandClick.current = true
@@ -144,9 +147,9 @@ export function Header() {
     simulation.openDialog()
   }
 
-  /** Long-press opens simulation while on Active Race (or while a sim is already running). */
+  /** Long-press opens simulation while on Active Race (or while a sim is already running). Hidden on demo events. */
   const brandLongPressEnabled =
-    simulation != null && (onLivePage || Boolean(simulation.isActive))
+    !demoEvent && simulation != null && (onLivePage || Boolean(simulation.isActive))
 
   return (
     <header
@@ -162,9 +165,11 @@ export function Header() {
           to="/"
           className="flex min-h-11 shrink-0 touch-manipulation items-center gap-2 select-none"
           title={
-            brandLongPressEnabled
-              ? 'Go to Home (Ctrl+click or long-press for race simulation)'
-              : 'Go to Home (Ctrl+click or long-press on Active Race for simulation)'
+            demoEvent
+              ? 'Go to Home'
+              : brandLongPressEnabled
+                ? 'Go to Home (Ctrl+click or long-press for race simulation)'
+                : 'Go to Home (Ctrl+click or long-press on Active Race for simulation)'
           }
           onClick={(event) => {
             if (suppressBrandClick.current) {
@@ -173,7 +178,7 @@ export function Header() {
               suppressBrandClick.current = false
               return
             }
-            if (!event.ctrlKey || !simulation) return
+            if (!event.ctrlKey || !simulation || demoEvent) return
             openSimulationFromBrand(event)
           }}
           onPointerDown={(event) => {

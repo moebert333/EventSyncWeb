@@ -36,7 +36,7 @@ participants (org-scoped)
 | `organizations` | Org name unique |
 | `series` | Belongs to org; unique `(organization_id, name)` |
 | `events` | Belongs to series; unique `(series_id, name)`; optional `date`, `track`, `location`, `active_race_id` |
-| `event_codes` | PK `event_id` → `events`; `code` text |
+| `event_codes` | PK `event_id` → `events`; `code` text; `demo` boolean default false |
 | `races` | `race_num`, `session_name`, `completed`, `active` |
 | `classes` | Per event; unique `(event_id, class_name)` |
 | `race_class` | Which classes run in a race |
@@ -65,9 +65,14 @@ Table `event_points` (not a view) feeds Place→Points enrichment on Completed R
 
 `race_in_progress` already joins `races` + `events` + `status` where `races.active` is true and status ∈ (`Staging`, `Active`, `Paused`, `Finished`). Finished stays in the view so the live page can keep showing that race and its `active_race_timing` rows until the race is no longer active.
 
-### Simulation mode (no writes)
+### Simulation (no writes)
 
-Client-only Active Race demo (`03-ui.md` §3b) may **read** entrants via `active_race_participants` (or `race_class` + `event_entry` + `participants`) and race metadata for the current event. It must **not** write `active_timing`, `status`, `races`, or any other race/timing table. While simulating, `/live` hooks serve in-memory rows shaped like `race_in_progress` / `active_race_timing` instead of polling those views for that event.
+Client-only simulation (`03-ui.md` §3b) may **read** entrants via `active_race_participants` (or `race_class` + `event_entry` + `participants`) and race metadata for the current event. It must **not** write `active_timing`, `status`, `races`, or any other race/timing table.
+
+- Resolve path selects `event_codes.demo`. When `demo` is true, the client auto-starts a continuous simulation after Event Code resolve.
+- While simulating, `/live` hooks serve in-memory rows shaped like `race_in_progress` / `active_race_timing` instead of polling those views for that event.
+- **Demo mode** also applies a **local** overlay on the race-order query result (`active` / `completed` / `status`) so Race Order, Warning text, and Staging alerts follow the simulated race. Results pages still read real `event_class_results` / DB only (no fabricated results).
+- Constants (client): `SIMULATE_SECS` (Staging + Finished hold), `SIMULATE_LAPS` / `MAX_SIMULATION_LAPS` (laps before Finished), `SIMULATE_LAP_SEC` (demo base lap seconds).
 
 ## Schema additions required for this website
 
@@ -285,7 +290,7 @@ Generate or hand-write `src/types/database.ts` covering tables + views used by t
 
 Optional tiny fixture for empty projects:
 
-- 1 organization, 1 series, 2 events (one with code `DEMO01AB`)
+- 1 organization, 1 series, 2 events (one with code `DEMO01AB`, `demo=true`)
 - 2 classes, 1 active race + `status = 'Active'`, a few `active_timing` rows
 - 1 completed event with `event_results`
 - 1 `admin_allowlist` email matching the developer
@@ -313,8 +318,8 @@ Maintain a **regenerable** sample dataset for integration testing of Live, Race 
 |---|---|
 | Organization | Name `MX Racing Inc`, `org_key` `mx-racing-inc` |
 | Series | `Moto Challenge 2027` |
-| Events | **5** events, dates spring→summer **2027**, names `{Track}-{Month} Event`, fictitious Colorado tracks/locations |
-| Event codes | `MX-2027-1` … `MX-2027-5` (easy to remember; 4–12 chars) |
+| Events | **5** events, dates spring→summer **2027**, names `{Track}-{Month}` (no trailing “Event”), fictitious Colorado tracks/locations |
+| Event codes | `ESYNC-DEMO-1` … `ESYNC-DEMO-5` (all `demo=true`; 4–12 chars) |
 | Participants | ~**150** org-scoped riders; random names; **more males than females**; cities mostly Colorado; same riders reused across all events |
 | Classes | ~**10** class names in `classes` (per event); class sizes vary but sum ≈ 150; **same class roster** (same riders in the same class names) every event |
 | Entries | `event_entry` for every rider/class/event |
@@ -334,4 +339,4 @@ Maintain a **regenerable** sample dataset for integration testing of Live, Race 
 # or: .\scripts\seed-moto-challenge.ps1 -DbPassword "..." / -DatabaseUrl "postgresql://..."
 ```
 
-After load, smoke-test with Event Codes `MX-2027-1`…`MX-2027-5` (live timing on `MX-2027-4`).
+After load, smoke-test with Event Codes `ESYNC-DEMO-1`…`ESYNC-DEMO-5` (all enter **Demo mode** auto-sim; DB live timing sample remains on `ESYNC-DEMO-4` race 11).

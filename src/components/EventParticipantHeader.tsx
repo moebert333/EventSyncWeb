@@ -13,6 +13,14 @@ import { SelectParticipantBox } from './SelectParticipantBox'
 /** Site header (safe area + bar) so this strip sticks just under it. */
 const STICKY_TOP = 'top-[calc(3.75rem+env(safe-area-inset-top,0px))]'
 
+/** Mobile event name cap: total length including trailing `..` when truncated. */
+const MOBILE_EVENT_NAME_MAX = 15
+
+function truncateForMobile(name: string): string {
+  if (name.length <= MOBILE_EVENT_NAME_MAX) return name
+  return `${name.slice(0, MOBILE_EVENT_NAME_MAX - 2)}..`
+}
+
 type EventParticipantHeaderProps = {
   eventId: number
   eventName: string
@@ -31,8 +39,10 @@ export function EventParticipantHeader({
   sticky = true,
   onParticipantChanged,
 }: EventParticipantHeaderProps) {
-  const { selectedParticipant } = useEventCode()
+  const { context, selectedParticipant } = useEventCode()
+  const demoMode = Boolean(context?.demo)
   const [picking, setPicking] = useState(false)
+  const mobileEventName = truncateForMobile(eventName)
 
   const selectedForEvent =
     selectedParticipant?.eventId === eventId ? selectedParticipant : null
@@ -75,7 +85,24 @@ export function EventParticipantHeader({
       <div className="space-y-1">
         <div className="flex min-h-[1.75rem] flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <p className="min-w-0 text-lg font-bold leading-tight">
-            <span className="text-zinc-400">Event:</span> <span className="text-white">{eventName}</span>
+            <span className="text-zinc-400">Event:</span>{' '}
+            {demoMode ? (
+              <>
+                <span className="text-[#f5c518] md:hidden" title={eventName}>
+                  DEMO MODE
+                </span>
+                <span className="hidden text-[#f5c518] md:inline" title={eventName}>
+                  DEMO MODE - {eventName}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-white md:hidden" title={eventName}>
+                  {mobileEventName}
+                </span>
+                <span className="hidden text-white md:inline">{eventName}</span>
+              </>
+            )}
           </p>
           <span className="shrink-0 text-right text-lg font-bold leading-tight">
             <span className="text-zinc-400">Rider:</span>{' '}

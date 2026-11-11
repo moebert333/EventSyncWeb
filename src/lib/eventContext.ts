@@ -12,6 +12,8 @@ export type StoredEventContext = {
   eventDate: string | null
   track: string | null
   location: string | null
+  /** From event_codes.demo — drives continuous client-only demo simulation. */
+  demo: boolean
 }
 
 function isStoredContext(value: unknown): value is StoredEventContext {
@@ -39,6 +41,7 @@ export function loadEventContext(): StoredEventContext | null {
       eventDate: typeof parsed.eventDate === 'string' ? parsed.eventDate : null,
       track: typeof parsed.track === 'string' ? parsed.track : null,
       location: typeof parsed.location === 'string' ? parsed.location : null,
+      demo: Boolean((parsed as { demo?: unknown }).demo),
     }
   } catch {
     return null

@@ -2,7 +2,7 @@ import { escapeIlikePattern, isEventCodeShape } from './codes'
 import type { StoredEventContext } from './eventContext'
 import { supabase } from './supabase'
 
-type CodeRow = { code: string; event_id: number }
+type CodeRow = { code: string; event_id: number; demo: boolean | null }
 type EventJoin = {
   event_id: number
   name: string
@@ -20,7 +20,7 @@ export async function resolveEventCode(raw: string): Promise<StoredEventContext 
 
   const codes = await supabase
     .from('event_codes')
-    .select('code, event_id')
+    .select('code, event_id, demo')
     .ilike('code', escapeIlikePattern(code))
     .limit(5)
   if (codes.error) throw codes.error
@@ -71,5 +71,6 @@ export async function resolveEventCode(raw: string): Promise<StoredEventContext 
     eventDate: event.date,
     track: event.track,
     location: event.location,
+    demo: Boolean(match.demo),
   }
 }

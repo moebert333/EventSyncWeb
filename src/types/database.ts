@@ -32,6 +32,7 @@ export type EventRow = {
 export type EventCodeRow = {
   event_id: number
   code: string
+  demo?: boolean | null
 }
 
 export type AllowlistRow = {

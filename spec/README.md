@@ -7,7 +7,7 @@ Executable build specs for the EventSync Vite + React + TypeScript + Supabase PW
 | [00-product.md](./00-product.md) | Purpose, personas, jobs, non-goals |
 | [01-stack.md](./01-stack.md) | Frozen stack, env, VS Code, phases, Event Code URL |
 | [02-data-supabase.md](./02-data-supabase.md) | Existing schema, required migrations, RLS, queries, sample seed scripts |
-| [03-ui.md](./03-ui.md) | Pages, routes (incl. Dashboard), states, MX magazine visual direction, simulation mode |
+| [03-ui.md](./03-ui.md) | Pages, routes (incl. Dashboard), states, MX magazine visual direction, simulation (demo + manual) |
 | [04-pwa.md](./04-pwa.md) | Installability, caching, persistence |
 | [05-acceptance.md](./05-acceptance.md) | Checklists for an agent or human implementer |
 
@@ -29,5 +29,6 @@ Executable build specs for the EventSync Vite + React + TypeScript + Supabase PW
 - Status effect media: `public/videos/` (`start_race`, `active_race`, `finish_race` mp4, `pause_race.jpg` while the video button is selected); toggled via a video icon beside the chart icon (mutually exclusive when selecting)
 - PWA: app shell offline, live timing network-only
 - Admin URL hidden from public nav
-- **Simulation mode** (Ctrl+click or long-press brand on `/live`): client-only fake Active Race timing; leave `/live` confirms cancel; hides Active Race header while running; Pause / Continue / Stop; races only; lap 2–120s (default 15); never writes timing DB
-- **Moto Challenge sample seed**: `scripts/seed-moto-challenge.ps1` regenerates and loads org `MX Racing Inc` / series `Moto Challenge 2027` (codes `MX-2027-1`…`5`; live on `MX-2027-4`); wipe only that org; Postgres URI required (not API keys)
+- **Demo mode** (`event_codes.demo`): auto continuous client-only sim (Staging → Active → Finished loop; races 5–10 or fallback); local race-order / staging overlay; never writes timing DB; Header manual start hidden
+- **Manual simulation** (non-demo only; Ctrl+click / long-press brand on `/live`): same phase loop for one chosen race; leave `/live` confirms cancel; Pause / Continue / Stop; lap 2–120s (default 5); never writes timing DB
+- **Moto Challenge sample seed**: `scripts/seed-moto-challenge.ps1` regenerates and loads org `MX Racing Inc` / series `Moto Challenge 2027` (codes `ESYNC-DEMO-1`…`5`, all `demo=true`; live on `ESYNC-DEMO-4`); wipe only that org; Postgres URI required (not API keys)

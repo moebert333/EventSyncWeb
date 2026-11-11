@@ -1,4 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
+import { useMemo } from 'react'
+import { applyRaceOrderOverlay } from '../lib/demoSimulation'
+import { useSimulationOptional } from '../lib/simulationContext'
 import { supabase } from '../lib/supabase'
 import type {
   EntryParticipant,
@@ -44,7 +47,8 @@ function participantName(related: ClassEntryRow['participants']): { first_name: 
 }
 
 export function useEventRaceOrder(eventId: number | null) {
-  return useQuery({
+  const simulation = useSimulationOptional()
+  const query = useQuery({
     queryKey: ['event-race-order', eventId],
     enabled: eventId != null,
     queryFn: async (): Promise<EventRaceOrderRow[]> => {
@@ -95,6 +99,21 @@ export function useEventRaceOrder(eventId: number | null) {
     },
     refetchInterval: 5000,
   })
+
+  const overlay =
+    simulation?.isActive &&
+    simulation.isDemoMode &&
+    simulation.eventId === eventId &&
+    simulation.raceOrderOverlay
+      ? simulation.raceOrderOverlay
+      : null
+
+  const data = useMemo(() => {
+    if (!query.data || !overlay) return query.data
+    return applyRaceOrderOverlay(query.data, overlay)
+  }, [query.data, overlay])
+
+  return { ...query, data }
 }
 
 /** Participants entered in a class for an event. */

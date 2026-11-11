@@ -10,6 +10,7 @@ import { LiveStreamPage } from './pages/future/LiveStreamPage'
 import { HomePage } from './pages/HomePage'
 import { RaceOrderPage } from './pages/RaceOrderPage'
 import { RacesInProgressPage } from './pages/RacesInProgressPage'
+import { RouteErrorPage } from './pages/RouteErrorPage'
 
 function MissingEnv() {
   return (
@@ -23,55 +24,60 @@ export const router = createBrowserRouter(
   hasSupabaseEnv
     ? [
         {
-          element: <AppShell />,
+          errorElement: <RouteErrorPage />,
           children: [
-            { path: '/', element: <HomePage /> },
             {
-              path: '/order',
-              element: (
-                <RequireEventContext>
-                  <RaceOrderPage />
-                </RequireEventContext>
-              ),
+              element: <AppShell />,
+              children: [
+                { path: '/', element: <HomePage /> },
+                {
+                  path: '/order',
+                  element: (
+                    <RequireEventContext>
+                      <RaceOrderPage />
+                    </RequireEventContext>
+                  ),
+                },
+                {
+                  path: '/live',
+                  element: (
+                    <RequireEventContext>
+                      <RacesInProgressPage />
+                    </RequireEventContext>
+                  ),
+                },
+                {
+                  path: '/results',
+                  element: (
+                    <RequireEventContext>
+                      <CompletedRacesPage />
+                    </RequireEventContext>
+                  ),
+                },
+                {
+                  path: '/dashboard',
+                  element: (
+                    <RequireEventContext>
+                      <AnalyzePage />
+                    </RequireEventContext>
+                  ),
+                },
+                { path: '/analyze', element: <Navigate to="/dashboard" replace /> },
+                {
+                  path: '/stream',
+                  element: (
+                    <RequireEventContext>
+                      <LiveStreamPage />
+                    </RequireEventContext>
+                  ),
+                },
+                { path: '*', element: <Navigate to="/" replace /> },
+              ],
             },
-            {
-              path: '/live',
-              element: (
-                <RequireEventContext>
-                  <RacesInProgressPage />
-                </RequireEventContext>
-              ),
-            },
-            {
-              path: '/results',
-              element: (
-                <RequireEventContext>
-                  <CompletedRacesPage />
-                </RequireEventContext>
-              ),
-            },
-            {
-              path: '/dashboard',
-              element: (
-                <RequireEventContext>
-                  <AnalyzePage />
-                </RequireEventContext>
-              ),
-            },
-            { path: '/analyze', element: <Navigate to="/dashboard" replace /> },
-            {
-              path: '/stream',
-              element: (
-                <RequireEventContext>
-                  <LiveStreamPage />
-                </RequireEventContext>
-              ),
-            },
-            { path: '*', element: <Navigate to="/" replace /> },
+            { path: '/admin/callback', element: <AdminCallbackPage /> },
+            { path: '/admin', element: <AdminPage /> },
           ],
         },
-        { path: '/admin/callback', element: <AdminCallbackPage /> },
-        { path: '/admin', element: <AdminPage /> },
       ]
-    : [{ path: '*', element: <MissingEnv /> }],
+    : [{ path: '*', element: <MissingEnv />, errorElement: <RouteErrorPage /> }],
 )

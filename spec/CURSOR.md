@@ -26,7 +26,7 @@ EventSync is a Vite + React + TypeScript PWA. Spectators enter an Event Code (no
 - Spectators never sign in. Access is Event Code, QR, or `/?code=`.
 - Admins use magic link + `admin_allowlist` + claim code. `/admin` is not in the public nav.
 - Website does not create organizations, series, events, timing, entries, or results. The local race app does.
-- Simulation mode (Ctrl+click or long-press brand on `/live`) is client-only fake `/live` data; it must never write timing/status/races. Spec: `03-ui.md` §3b.
+- Simulation is client-only and must never write timing/status/races. **Demo** (`event_codes.demo`): auto continuous loop + local race-order overlay. **Manual** (non-demo): Ctrl+click / long-press brand on `/live`, single-race phase loop. Spec: `03-ui.md` §3b.
 - Website admin may rename an organization (`name`, `description` only) and create/edit Event Codes after a successful claim.
 - Live timing is Supabase Realtime on `active_timing` and `status`. A 15–30s poll is backup only.
 - Do not implement phase 7 (race order, announcements, live stream) beyond stub pages.

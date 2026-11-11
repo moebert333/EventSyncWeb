@@ -13,8 +13,8 @@ values
   (9001, 9001, 'Spring Classic', 'Completed demo event', '2026-04-12', 'Town Track', 'Austin, TX'),
   (9002, 9001, 'Saturday National', 'Live demo event', '2026-10-18', 'Ridge MX', 'Austin, TX');
 
-insert into public.event_codes (event_id, code)
-values (9002, 'DEMO01AB');
+insert into public.event_codes (event_id, code, demo)
+values (9002, 'DEMO01AB', true);
 
 insert into public.classes (class_id, event_id, class_name)
 values
