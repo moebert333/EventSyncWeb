@@ -12,6 +12,12 @@ import {
   useOrgSeries,
   type ResultsFilter,
 } from '../hooks/useEventResults'
+import { useSeriesAnalyzeData } from '../hooks/useSeriesAnalyzeData'
+import {
+  computeStandingsByClass,
+  standingsRowsForDisplay,
+  type StandingRow,
+} from '../lib/analyzeMetrics'
 import { formatEventDate, riderName } from '../lib/format'
 import { formatPlaceLabel, motoKeysUpTo } from '../lib/resultsPoints'
 import {
@@ -19,6 +25,8 @@ import {
   loadResultsSelection,
   saveResultsSelection,
   type ResultsMode,
+  type ResultsScope,
+  type SeriesResultsRequest,
   type StoredResultsSelection,
 } from '../lib/resultsSelection'
 import type { EventClassResult } from '../types/database'
@@ -42,6 +50,11 @@ function cell(value: string | number | null): string {
 
 function isPlaceColumn(key: keyof EventClassResult): boolean {
   return key === 'overall_place' || key.endsWith('_place')
+}
+
+function fmtAvg(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—'
+  return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
 
 function optionalColumnsFor(rows: EventClassResult[], maxMoto: number | null) {
@@ -76,20 +89,24 @@ function applyParticipantDefault(
   participantId: number,
   eventId: number,
   setters: {
+    setScope: (scope: ResultsScope) => void
     setMode: (mode: ResultsMode) => void
     setClassName: (name: string) => void
     setEventId: (id: number) => void
     setParticipantId: (id: number | '') => void
     setRaceId: (id: number | '') => void
     setRequest: (request: ResultsFilter | null) => void
+    setSeriesRequest: (request: SeriesResultsRequest | null) => void
     setSelectOpen: (open: boolean) => void
   },
 ) {
+  setters.setScope('event')
   setters.setMode('participant')
   setters.setClassName('')
   setters.setEventId(eventId)
   setters.setParticipantId(participantId)
   setters.setRaceId('')
+  setters.setSeriesRequest(null)
   setters.setRequest({
     eventId,
     className: null,
@@ -99,25 +116,99 @@ function applyParticipantDefault(
   setters.setSelectOpen(false)
 }
 
+function StandingsTable({
+  standings,
+  highlightParticipantId,
+}: {
+  standings: StandingRow[]
+  highlightParticipantId: number | null
+}) {
+  const scored = standingsRowsForDisplay(standings)
+  if (scored.length === 0) {
+    return <p className="panel">No scored series points in this class yet.</p>
+  }
+  return (
+    <div className="table-wrap">
+      <table className="data">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Plate</th>
+            <th>Name</th>
+            <th>Points</th>
+            <th>Events</th>
+            <th>Avg</th>
+          </tr>
+        </thead>
+        <tbody>
+          {scored.map(({ row, rank }) => {
+            const selected =
+              highlightParticipantId != null && row.participantId === highlightParticipantId
+            return (
+              <tr key={row.participantId} className={selected ? 'is-selected' : undefined}>
+                <td>{rank}</td>
+                <td>{cell(row.plate)}</td>
+                <td>{row.name}</td>
+                <td>{row.points}</td>
+                <td>{row.events}</td>
+                <td>{fmtAvg(row.avgPlace)}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function CompletedRacesPage() {
   const { context, selectedParticipant } = useEventCode()
   const savedSelection = useMemo(() => loadResultsSelection(), [])
   const seriesQuery = useOrgSeries(context?.organizationId ?? null)
   const seriesIds = (seriesQuery.data ?? []).map((series) => series.series_id)
   const eventsQuery = useOrgEvents(seriesIds)
-  const [seriesFilter, setSeriesFilter] = useState<number | 'all'>(
-    savedSelection?.seriesFilter ?? context?.seriesId ?? 'all',
-  )
-  const [eventId, setEventId] = useState<number | null>(savedSelection?.eventId ?? context?.eventId ?? null)
-  const [mode, setMode] = useState<ResultsMode>(savedSelection?.mode ?? 'class')
+
+  const [scope, setScope] = useState<ResultsScope>(savedSelection?.scope ?? 'event')
+  const [seriesFilter, setSeriesFilter] = useState<number | 'all'>(() => {
+    if (savedSelection?.scope === 'series' && typeof savedSelection.seriesFilter === 'number') {
+      return savedSelection.seriesFilter
+    }
+    return context?.seriesId ?? savedSelection?.seriesFilter ?? 'all'
+  })
+  const [eventId, setEventId] = useState<number | null>(() => {
+    if (context?.seriesId != null && context.eventId != null) return context.eventId
+    return savedSelection?.eventId ?? context?.eventId ?? null
+  })
+  const [mode, setMode] = useState<ResultsMode>(() => {
+    const savedMode = savedSelection?.mode ?? 'class'
+    if ((savedSelection?.scope ?? 'event') === 'series' && savedMode === 'race') return 'class'
+    return savedMode
+  })
   const [className, setClassName] = useState(savedSelection?.className ?? '')
   const [participantId, setParticipantId] = useState<number | ''>(savedSelection?.participantId ?? '')
   const [raceId, setRaceId] = useState<number | ''>(savedSelection?.raceId ?? '')
   const [riderSearch, setRiderSearch] = useState('')
   const [filterError, setFilterError] = useState<string | null>(null)
-  const [request, setRequest] = useState<ResultsFilter | null>(savedSelection?.request ?? null)
-  const [selectOpen, setSelectOpen] = useState(() => savedSelection?.request == null)
-  const [defaultApplyDone, setDefaultApplyDone] = useState(() => savedSelection?.request != null)
+  const [request, setRequest] = useState<ResultsFilter | null>(
+    savedSelection?.scope === 'series' ? null : (savedSelection?.request ?? null),
+  )
+  const [seriesRequest, setSeriesRequest] = useState<SeriesResultsRequest | null>(
+    savedSelection?.scope === 'series' ? savedSelection.seriesRequest : null,
+  )
+  const [selectOpen, setSelectOpen] = useState(
+    () =>
+      savedSelection == null ||
+      (savedSelection.scope === 'series'
+        ? savedSelection.seriesRequest == null
+        : savedSelection.request == null),
+  )
+  const [defaultApplyDone, setDefaultApplyDone] = useState(
+    () =>
+      savedSelection != null &&
+      (savedSelection.scope === 'series'
+        ? savedSelection.seriesRequest != null
+        : savedSelection.request != null),
+  )
   const [savedInvalidated, setSavedInvalidated] = useState(false)
   const [collapsedClasses, setCollapsedClasses] = useState<Set<string>>(() => new Set())
 
@@ -129,19 +220,53 @@ export function CompletedRacesPage() {
 
   const selectedEventId = events.some((event) => event.event_id === eventId)
     ? eventId
-    : (events[0]?.event_id ?? null)
+    : (events.find((event) => event.event_id === context?.eventId)?.event_id ??
+      events[0]?.event_id ??
+      null)
 
-  const classesQuery = useEventClasses(selectedEventId)
-  const ridersQuery = useEventParticipants(selectedEventId)
-  const racesQuery = useEventRaces(selectedEventId)
-  const resultsQuery = useEventResults(request)
+  const seriesIdForStandings =
+    scope === 'series' && typeof seriesFilter === 'number' ? seriesFilter : null
+  const seriesAnalyzeQuery = useSeriesAnalyzeData(seriesIdForStandings)
+
+  const classesQuery = useEventClasses(scope === 'event' ? selectedEventId : null)
+  const ridersQuery = useEventParticipants(scope === 'event' ? selectedEventId : null)
+  const racesQuery = useEventRaces(scope === 'event' ? selectedEventId : null)
+  const resultsQuery = useEventResults(scope === 'event' ? request : null)
+
+  const seriesClassNames = useMemo(() => {
+    const rows = seriesAnalyzeQuery.data?.rows ?? []
+    return [...new Set(rows.map((row) => row.class_name))].sort((a, b) => a.localeCompare(b))
+  }, [seriesAnalyzeQuery.data?.rows])
+
+  const seriesRiders = seriesAnalyzeQuery.data?.riders ?? []
+
+  const standingsHighlightId =
+    seriesRequest?.participantId ??
+    (selectedParticipant && selectedParticipant.eventId === context?.eventId
+      ? selectedParticipant.participantId
+      : null)
+
+  const standingsByClass = useMemo(() => {
+    const payload = seriesAnalyzeQuery.data
+    if (!payload || seriesRequest == null) return {}
+    return computeStandingsByClass(payload.events, payload.rows, standingsHighlightId)
+  }, [seriesAnalyzeQuery.data, seriesRequest, standingsHighlightId])
 
   useEffect(() => {
     setCollapsedClasses(new Set())
-  }, [request?.eventId, request?.className, request?.participantId, request?.raceId])
+  }, [
+    request?.eventId,
+    request?.className,
+    request?.participantId,
+    request?.raceId,
+    seriesRequest?.seriesId,
+    seriesRequest?.className,
+    seriesRequest?.participantId,
+  ])
 
   // Drop a race filter that points at a practice (or otherwise missing) race.
   useEffect(() => {
+    if (scope !== 'event') return
     if (!racesQuery.isSuccess) return
     const races = racesQuery.data ?? []
     const raceMissing =
@@ -154,46 +279,59 @@ export function CompletedRacesPage() {
       setSelectOpen(true)
       clearResultsSelection()
     }
-  }, [racesQuery.isSuccess, racesQuery.data, raceId, request?.raceId])
+  }, [scope, racesQuery.isSuccess, racesQuery.data, raceId, request?.raceId])
 
   if (!context) return null
+  const eventContext = context
 
-  // Drop a stored selection whose event is no longer available in this org.
-  if (
-    !savedInvalidated &&
-    savedSelection &&
-    eventsQuery.isSuccess &&
-    !(eventsQuery.data ?? []).some((event) => event.event_id === savedSelection.eventId)
-  ) {
-    clearResultsSelection()
-    setSavedInvalidated(true)
-    setRequest(null)
-    setDefaultApplyDone(false)
-    setSelectOpen(true)
+  // Drop a stored selection that no longer matches available series/events.
+  if (!savedInvalidated && savedSelection && eventsQuery.isSuccess && seriesQuery.isSuccess) {
+    const eventMissing =
+      savedSelection.scope !== 'series' &&
+      !(eventsQuery.data ?? []).some((event) => event.event_id === savedSelection.eventId)
+    const seriesMissing =
+      savedSelection.scope === 'series' &&
+      (typeof savedSelection.seriesFilter !== 'number' ||
+        !(seriesQuery.data ?? []).some((series) => series.series_id === savedSelection.seriesFilter))
+    if (eventMissing || seriesMissing) {
+      clearResultsSelection()
+      setSavedInvalidated(true)
+      setRequest(null)
+      setSeriesRequest(null)
+      setDefaultApplyDone(false)
+      setSelectOpen(true)
+    }
   }
 
   if (!defaultApplyDone && loadResultsSelection() == null) {
     const current =
-      selectedParticipant && selectedParticipant.eventId === context.eventId ? selectedParticipant : null
+      selectedParticipant && selectedParticipant.eventId === eventContext.eventId
+        ? selectedParticipant
+        : null
     if (current) {
       setDefaultApplyDone(true)
+      setSeriesFilter(eventContext.seriesId)
       applyParticipantDefault(current.participantId, current.eventId, {
+        setScope,
         setMode,
         setClassName,
         setEventId,
         setParticipantId,
         setRaceId,
         setRequest,
+        setSeriesRequest,
         setSelectOpen,
       })
     } else {
       setDefaultApplyDone(true)
+      setSeriesFilter(eventContext.seriesId)
       setSelectOpen(true)
     }
   }
 
   const needle = riderSearch.trim().toLowerCase()
-  const matchingRiders = (ridersQuery.data ?? []).filter((rider) => {
+  const riderSource = scope === 'series' ? seriesRiders : (ridersQuery.data ?? [])
+  const matchingRiders = riderSource.filter((rider) => {
     if (!needle) return true
     return `${rider.first_name} ${rider.last_name} ${rider.participant_plate ?? ''}`.toLowerCase().includes(needle)
   })
@@ -202,15 +340,35 @@ export function CompletedRacesPage() {
     ? Math.min(Math.max(matchingRiders.length, 1), 10)
     : 1
 
+  function onScopeChange(next: ResultsScope) {
+    setScope(next)
+    setRequest(null)
+    setSeriesRequest(null)
+    setFilterError(null)
+    setRaceId('')
+    if (next === 'series') {
+      if (seriesFilter === 'all') setSeriesFilter(eventContext.seriesId)
+      if (mode === 'race') setMode('class')
+    }
+  }
+
   function onSeriesChange(value: string) {
     const next = value === 'all' ? 'all' : Number(value)
+    if (scope === 'series' && next === 'all') {
+      setFilterError('Choose a series for standings.')
+      return
+    }
     setSeriesFilter(next)
     setRequest(null)
+    setSeriesRequest(null)
+    setClassName('')
+    setParticipantId('')
+    setRaceId('')
     const pool =
       next === 'all' ? (eventsQuery.data ?? []) : (eventsQuery.data ?? []).filter((event) => event.series_id === next)
     const stillThere = pool.some((event) => event.event_id === selectedEventId)
     if (!stillThere) {
-      const preferred = pool.find((event) => event.event_id === context?.eventId) ?? pool[0]
+      const preferred = pool.find((event) => event.event_id === eventContext.eventId) ?? pool[0]
       setEventId(preferred?.event_id ?? null)
     }
   }
@@ -218,12 +376,12 @@ export function CompletedRacesPage() {
   function onRiderSearchChange(value: string) {
     setRiderSearch(value)
     const nextNeedle = value.trim().toLowerCase()
-    const matches = (ridersQuery.data ?? []).filter((rider) => {
+    const matches = riderSource.filter((rider) => {
       if (!nextNeedle) return true
       return `${rider.first_name} ${rider.last_name} ${rider.participant_plate ?? ''}`.toLowerCase().includes(nextNeedle)
     })
     if (matches.length === 1) {
-      setParticipantId(matches[0].participant_id)
+      setParticipantId(matches[0]!.participant_id)
       return
     }
     if (participantId !== '' && !matches.some((rider) => rider.participant_id === participantId)) {
@@ -240,6 +398,50 @@ export function CompletedRacesPage() {
     let resolvedParticipantId = overrides?.participantId ?? participantId
     const nextRaceId = overrides?.raceId ?? raceId
 
+    if (scope === 'series') {
+      if (typeof seriesFilter !== 'number') {
+        setFilterError('Choose a series.')
+        return
+      }
+      if (mode === 'class' && !nextClassName) {
+        setFilterError('Choose a class.')
+        return
+      }
+      if (mode === 'participant') {
+        if (resolvedParticipantId === '' && matchingRiders.length === 1) {
+          resolvedParticipantId = matchingRiders[0]!.participant_id
+          setParticipantId(resolvedParticipantId)
+        }
+        if (resolvedParticipantId === '') {
+          setFilterError('Choose a rider.')
+          return
+        }
+      }
+      const seriesMode: ResultsMode = mode === 'participant' ? 'participant' : 'class'
+      const nextSeriesRequest: SeriesResultsRequest = {
+        seriesId: seriesFilter,
+        className: seriesMode === 'class' ? nextClassName : null,
+        participantId: seriesMode === 'participant' ? Number(resolvedParticipantId) : null,
+      }
+      const nextSelection: StoredResultsSelection = {
+        scope: 'series',
+        seriesFilter,
+        eventId: selectedEventId ?? eventContext.eventId,
+        mode: seriesMode,
+        className: seriesMode === 'class' ? nextClassName : '',
+        participantId: seriesMode === 'participant' ? Number(resolvedParticipantId) : '',
+        raceId: '',
+        request: null,
+        seriesRequest: nextSeriesRequest,
+      }
+      setFilterError(null)
+      setRequest(null)
+      setSeriesRequest(nextSeriesRequest)
+      saveResultsSelection(nextSelection)
+      setSelectOpen(false)
+      return
+    }
+
     if (selectedEventId == null) {
       setFilterError('Pick an event.')
       return
@@ -254,7 +456,7 @@ export function CompletedRacesPage() {
     }
     if (mode === 'participant') {
       if (resolvedParticipantId === '' && matchingRiders.length === 1) {
-        resolvedParticipantId = matchingRiders[0].participant_id
+        resolvedParticipantId = matchingRiders[0]!.participant_id
         setParticipantId(resolvedParticipantId)
       }
       if (resolvedParticipantId === '') {
@@ -269,6 +471,7 @@ export function CompletedRacesPage() {
       raceId: mode === 'race' ? Number(nextRaceId) : null,
     }
     const nextSelection: StoredResultsSelection = {
+      scope: 'event',
       seriesFilter,
       eventId: selectedEventId,
       mode,
@@ -276,8 +479,10 @@ export function CompletedRacesPage() {
       participantId: mode === 'participant' ? Number(resolvedParticipantId) : '',
       raceId: mode === 'race' ? Number(nextRaceId) : '',
       request: nextRequest,
+      seriesRequest: null,
     }
     setFilterError(null)
+    setSeriesRequest(null)
     setRequest(nextRequest)
     saveResultsSelection(nextSelection)
     setSelectOpen(false)
@@ -299,7 +504,7 @@ export function CompletedRacesPage() {
   const collapsibleClasses = classGroups.length > 1
   const loading = seriesQuery.isLoading || eventsQuery.isLoading
   const loadError = seriesQuery.error ?? eventsQuery.error
-  // Highlight the results-filter participant when set; otherwise the page participant in class views.
+
   const highlightParticipantId =
     request?.participantId ??
     (selectedParticipant && request && selectedParticipant.eventId === request.eventId
@@ -307,7 +512,29 @@ export function CompletedRacesPage() {
       : null)
 
   let selectedResultsLabel: string | null = null
-  if (request?.className) {
+  if (scope === 'series' && seriesRequest) {
+    if (seriesRequest.className) {
+      selectedResultsLabel = `${seriesRequest.className} · Series standings`
+    } else if (seriesRequest.participantId != null) {
+      const rider =
+        seriesRiders.find((row) => row.participant_id === seriesRequest.participantId) ??
+        (selectedParticipant?.participantId === seriesRequest.participantId
+          ? {
+              first_name: selectedParticipant.firstName,
+              last_name: selectedParticipant.lastName,
+              participant_plate: selectedParticipant.participantPlate,
+            }
+          : null)
+      if (rider) {
+        selectedResultsLabel =
+          riderName(rider.first_name, rider.last_name) +
+          (rider.participant_plate ? ` · ${rider.participant_plate}` : '') +
+          ' · Series standings'
+      } else {
+        selectedResultsLabel = 'Series standings'
+      }
+    }
+  } else if (request?.className) {
     selectedResultsLabel = request.className
   } else if (request?.participantId != null) {
     const rider =
@@ -327,6 +554,17 @@ export function CompletedRacesPage() {
     selectedResultsLabel = race ? raceOptionLabel(race) : `Race ${request.raceId}`
   }
 
+  const seriesRiderClassGroups =
+    seriesRequest?.participantId != null
+      ? Object.entries(standingsByClass)
+          .filter(([, standings]) =>
+            standings.some(
+              (row) => row.participantId === seriesRequest.participantId && row.points > 0,
+            ),
+          )
+          .map(([name, standings]) => ({ className: name, standings }))
+      : []
+
   return (
     <div className="space-y-6">
       <EventParticipantHeader
@@ -335,14 +573,20 @@ export function CompletedRacesPage() {
         pageTitle="Event Results"
         onParticipantChanged={() => {
           const saved = loadResultsSelection()
-          // Selecting a participant in the picker also updates Results selection.
-          if (saved?.mode === 'participant' && saved.request.participantId != null) {
-            setSeriesFilter(saved.seriesFilter)
+          // Selecting a participant in the picker also updates Results selection (event scope).
+          if (
+            saved?.scope === 'event' &&
+            saved.mode === 'participant' &&
+            saved.request?.participantId != null
+          ) {
+            setScope('event')
+            setSeriesFilter(saved.seriesFilter === 'all' ? context.seriesId : saved.seriesFilter)
             setEventId(saved.eventId)
             setMode('participant')
             setClassName('')
             setParticipantId(saved.participantId)
             setRaceId('')
+            setSeriesRequest(null)
             setRequest(saved.request)
             setSelectOpen(false)
             setDefaultApplyDone(true)
@@ -415,15 +659,46 @@ export function CompletedRacesPage() {
                 <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-400">Organization</span>
                 <span className="text-base font-semibold">{context.organizationName}</span>
               </p>
+
+              <div
+                className="flex flex-wrap items-center gap-x-4 gap-y-1"
+                role="radiogroup"
+                aria-label="Show"
+              >
+                <span className="shrink-0 text-sm uppercase tracking-wide text-zinc-400">Show</span>
+                <label className="inline-flex items-center gap-2" title="Show single-event results">
+                  <input
+                    type="radio"
+                    name="results-scope"
+                    checked={scope === 'event'}
+                    onChange={() => onScopeChange('event')}
+                  />
+                  Event results
+                </label>
+                <label className="inline-flex items-center gap-2" title="Show series championship standings">
+                  <input
+                    type="radio"
+                    name="results-scope"
+                    checked={scope === 'series'}
+                    onChange={() => onScopeChange('series')}
+                  />
+                  Series standings
+                </label>
+              </div>
+
               <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm uppercase tracking-wide text-zinc-400">
                 <span className="shrink-0">Series</span>
                 <select
                   className="control min-w-0 flex-1"
-                  title="Filter events by series"
+                  title={
+                    scope === 'series'
+                      ? 'Choose which series standings to show'
+                      : 'Filter events by series'
+                  }
                   value={seriesFilter === 'all' ? 'all' : String(seriesFilter)}
                   onChange={(event) => onSeriesChange(event.target.value)}
                 >
-                  <option value="all">All series</option>
+                  {scope === 'event' ? <option value="all">All series</option> : null}
                   {(seriesQuery.data ?? []).map((series) => (
                     <option key={series.series_id} value={series.series_id}>
                       {series.name}
@@ -431,29 +706,32 @@ export function CompletedRacesPage() {
                   ))}
                 </select>
               </label>
-              <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm uppercase tracking-wide text-zinc-400">
-                <span className="shrink-0">Event</span>
-                <select
-                  className="control min-w-0 flex-1"
-                  title="Choose which event’s results to show"
-                  value={selectedEventId ?? ''}
-                  onChange={(event) => {
-                    setEventId(Number(event.target.value))
-                    setClassName('')
-                    setParticipantId('')
-                    setRaceId('')
-                    setRequest(null)
-                  }}
-                >
-                  {events.length === 0 ? <option value="">No events</option> : null}
-                  {events.map((event) => (
-                    <option key={event.event_id} value={event.event_id}>
-                      {event.name}
-                      {formatEventDate(event.date) ? ` · ${formatEventDate(event.date)}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
+
+              {scope === 'event' ? (
+                <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm uppercase tracking-wide text-zinc-400">
+                  <span className="shrink-0">Event</span>
+                  <select
+                    className="control min-w-0 flex-1"
+                    title="Choose which event’s results to show"
+                    value={selectedEventId ?? ''}
+                    onChange={(event) => {
+                      setEventId(Number(event.target.value))
+                      setClassName('')
+                      setParticipantId('')
+                      setRaceId('')
+                      setRequest(null)
+                    }}
+                  >
+                    {events.length === 0 ? <option value="">No events</option> : null}
+                    {events.map((event) => (
+                      <option key={event.event_id} value={event.event_id}>
+                        {event.name}
+                        {formatEventDate(event.date) ? ` · ${formatEventDate(event.date)}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
 
               <div
                 className="flex flex-wrap items-center gap-x-4 gap-y-1"
@@ -469,6 +747,7 @@ export function CompletedRacesPage() {
                     onChange={() => {
                       setMode('class')
                       setRequest(null)
+                      setSeriesRequest(null)
                     }}
                   />
                   Class
@@ -481,22 +760,35 @@ export function CompletedRacesPage() {
                     onChange={() => {
                       setMode('participant')
                       setRequest(null)
+                      setSeriesRequest(null)
+                      // Seed with the Event Code rider when switching into Rider filter.
+                      if (
+                        selectedParticipant &&
+                        (scope === 'series' ||
+                          selectedParticipant.eventId === selectedEventId ||
+                          selectedParticipant.eventId === eventContext.eventId)
+                      ) {
+                        setParticipantId(selectedParticipant.participantId)
+                      }
                     }}
                   />
                   Rider
                 </label>
-                <label className="inline-flex items-center gap-2" title="Filter results by race">
-                  <input
-                    type="radio"
-                    name="result-mode"
-                    checked={mode === 'race'}
-                    onChange={() => {
-                      setMode('race')
-                      setRequest(null)
-                    }}
-                  />
-                  Race
-                </label>
+                {scope === 'event' ? (
+                  <label className="inline-flex items-center gap-2" title="Filter results by race">
+                    <input
+                      type="radio"
+                      name="result-mode"
+                      checked={mode === 'race'}
+                      onChange={() => {
+                        setMode('race')
+                        setRequest(null)
+                        setSeriesRequest(null)
+                      }}
+                    />
+                    Race
+                  </label>
+                ) : null}
               </div>
 
               {mode === 'class' ? (
@@ -513,11 +805,17 @@ export function CompletedRacesPage() {
                     }}
                   >
                     <option value="">Select a class</option>
-                    {(classesQuery.data ?? []).map((row) => (
-                      <option key={row.class_id} value={row.class_name}>
-                        {row.class_name}
-                      </option>
-                    ))}
+                    {scope === 'series'
+                      ? seriesClassNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))
+                      : (classesQuery.data ?? []).map((row) => (
+                          <option key={row.class_id} value={row.class_name}>
+                            {row.class_name}
+                          </option>
+                        ))}
                   </select>
                 </label>
               ) : mode === 'participant' ? (
@@ -599,93 +897,176 @@ export function CompletedRacesPage() {
         </section>
       ) : null}
 
-      {resultsQuery.isLoading ? <Skeleton /> : null}
-      {resultsQuery.error ? (
-        <div className="panel" role="alert">
-          <p>{resultsQuery.error instanceof Error ? resultsQuery.error.message : 'Could not load results.'}</p>
-          <button
-            type="button"
-            className="btn mt-4"
-            title="Retry loading results"
-            onClick={() => void resultsQuery.refetch()}
-          >
-            Retry
-          </button>
-        </div>
-      ) : null}
-      {resultsQuery.isSuccess && rows.length === 0 ? <p className="panel">No results posted for this selection yet.</p> : null}
-      {classGroups.length > 0 ? (
-        <div className="space-y-6">
-          {classGroups.map((group) => {
-            const classId = group.rows[0]?.class_id
-            const maxMoto = classId != null ? (maxMotoByClass[classId] ?? null) : null
-            const optional = optionalColumnsFor(group.rows, maxMoto)
-            const expanded = !collapsedClasses.has(group.className)
-            return (
-              <div key={group.className} className="space-y-2">
-                {collapsibleClasses ? (
-                  <button
-                    type="button"
-                    className="inline-flex cursor-pointer items-center gap-2 bg-transparent p-0 text-left"
-                    aria-expanded={expanded}
-                    title={expanded ? `Hide ${group.className}` : `Show ${group.className}`}
-                    onClick={() => toggleClassTable(group.className)}
-                  >
-                    <span className="font-display text-xl font-bold uppercase text-[#f0d56a] underline underline-offset-2">
-                      {group.className}
-                    </span>
-                    <span className="text-base leading-none text-[#f5c518]" aria-hidden="true">
-                      {expanded ? '▲' : '▼'}
-                    </span>
-                  </button>
-                ) : (
-                  <h2 className="font-display text-xl font-bold uppercase">{group.className}</h2>
-                )}
-                {expanded ? (
-                  <div className="table-wrap">
-                    <table className="data">
-                      <thead>
-                        <tr>
-                          <th>Place</th>
-                          <th>Plate</th>
-                          <th>Name</th>
-                          {optional.map((column) => (
-                            <th key={column.key}>{column.label}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.rows.map((row) => {
-                          const isSelectedParticipant = highlightParticipantId === row.participant_id
-                          return (
-                            <tr
-                              key={`${row.class_id}-${row.participant_id}`}
-                              className={isSelectedParticipant ? 'is-selected' : undefined}
-                            >
-                              <td>{formatPlaceLabel(row.overall_place, statusByPosition)}</td>
-                              <td>{cell(row.participant_plate)}</td>
-                              <td>{riderName(row.first_name, row.last_name)}</td>
+      {scope === 'event' ? (
+        <>
+          {resultsQuery.isLoading ? <Skeleton /> : null}
+          {resultsQuery.error ? (
+            <div className="panel" role="alert">
+              <p>
+                {resultsQuery.error instanceof Error
+                  ? resultsQuery.error.message
+                  : 'Could not load results.'}
+              </p>
+              <button
+                type="button"
+                className="btn mt-4"
+                title="Retry loading results"
+                onClick={() => void resultsQuery.refetch()}
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
+          {resultsQuery.isSuccess && rows.length === 0 ? (
+            <p className="panel">No results posted for this selection yet.</p>
+          ) : null}
+          {classGroups.length > 0 ? (
+            <div className="space-y-6">
+              {classGroups.map((group) => {
+                const classId = group.rows[0]?.class_id
+                const maxMoto = classId != null ? (maxMotoByClass[classId] ?? null) : null
+                const optional = optionalColumnsFor(group.rows, maxMoto)
+                const expanded = !collapsedClasses.has(group.className)
+                return (
+                  <div key={group.className} className="space-y-2">
+                    {collapsibleClasses ? (
+                      <button
+                        type="button"
+                        className="inline-flex cursor-pointer items-center gap-2 bg-transparent p-0 text-left"
+                        aria-expanded={expanded}
+                        title={expanded ? `Hide ${group.className}` : `Show ${group.className}`}
+                        onClick={() => toggleClassTable(group.className)}
+                      >
+                        <span className="font-display text-xl font-bold uppercase text-[#f0d56a] underline underline-offset-2">
+                          {group.className}
+                        </span>
+                        <span className="text-base leading-none text-[#f5c518]" aria-hidden="true">
+                          {expanded ? '▲' : '▼'}
+                        </span>
+                      </button>
+                    ) : (
+                      <h2 className="font-display text-xl font-bold uppercase">{group.className}</h2>
+                    )}
+                    {expanded ? (
+                      <div className="table-wrap">
+                        <table className="data">
+                          <thead>
+                            <tr>
+                              <th>Place</th>
+                              <th>Plate</th>
+                              <th>Name</th>
                               {optional.map((column) => (
-                                <td key={column.key}>
-                                  {isPlaceColumn(column.key)
-                                    ? formatPlaceLabel(
-                                        row[column.key] as string | number | null,
-                                        statusByPosition,
-                                      )
-                                    : cell(row[column.key] as string | number | null)}
-                                </td>
+                                <th key={column.key}>{column.label}</th>
                               ))}
                             </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                          </thead>
+                          <tbody>
+                            {group.rows.map((row) => {
+                              const isSelectedParticipant =
+                                highlightParticipantId === row.participant_id
+                              return (
+                                <tr
+                                  key={`${row.class_id}-${row.participant_id}`}
+                                  className={isSelectedParticipant ? 'is-selected' : undefined}
+                                >
+                                  <td>{formatPlaceLabel(row.overall_place, statusByPosition)}</td>
+                                  <td>{cell(row.participant_plate)}</td>
+                                  <td>{riderName(row.first_name, row.last_name)}</td>
+                                  {optional.map((column) => (
+                                    <td key={column.key}>
+                                      {isPlaceColumn(column.key)
+                                        ? formatPlaceLabel(
+                                            row[column.key] as string | number | null,
+                                            statusByPosition,
+                                          )
+                                        : cell(row[column.key] as string | number | null)}
+                                    </td>
+                                  ))}
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                )
+              })}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {scope === 'series' && seriesRequest ? (
+        <>
+          {seriesAnalyzeQuery.isLoading ? <Skeleton /> : null}
+          {seriesAnalyzeQuery.error ? (
+            <div className="panel" role="alert">
+              <p>
+                {seriesAnalyzeQuery.error instanceof Error
+                  ? seriesAnalyzeQuery.error.message
+                  : 'Could not load series standings.'}
+              </p>
+              <button
+                type="button"
+                className="btn mt-4"
+                title="Retry loading series standings"
+                onClick={() => void seriesAnalyzeQuery.refetch()}
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
+          {seriesAnalyzeQuery.isSuccess && seriesRequest.className ? (
+            <div className="space-y-2">
+              <h2 className="font-display text-xl font-bold uppercase">{seriesRequest.className}</h2>
+              <StandingsTable
+                standings={standingsByClass[seriesRequest.className] ?? []}
+                highlightParticipantId={standingsHighlightId}
+              />
+            </div>
+          ) : null}
+          {seriesAnalyzeQuery.isSuccess && seriesRequest.participantId != null ? (
+            seriesRiderClassGroups.length === 0 ? (
+              <p className="panel">No scored series points for this rider yet.</p>
+            ) : (
+              <div className="space-y-6">
+                {seriesRiderClassGroups.map((group) => {
+                  const expanded = !collapsedClasses.has(group.className)
+                  const multi = seriesRiderClassGroups.length > 1
+                  return (
+                    <div key={group.className} className="space-y-2">
+                      {multi ? (
+                        <button
+                          type="button"
+                          className="inline-flex cursor-pointer items-center gap-2 bg-transparent p-0 text-left"
+                          aria-expanded={expanded}
+                          title={expanded ? `Hide ${group.className}` : `Show ${group.className}`}
+                          onClick={() => toggleClassTable(group.className)}
+                        >
+                          <span className="font-display text-xl font-bold uppercase text-[#f0d56a] underline underline-offset-2">
+                            {group.className}
+                          </span>
+                          <span className="text-base leading-none text-[#f5c518]" aria-hidden="true">
+                            {expanded ? '▲' : '▼'}
+                          </span>
+                        </button>
+                      ) : (
+                        <h2 className="font-display text-xl font-bold uppercase">{group.className}</h2>
+                      )}
+                      {expanded || !multi ? (
+                        <StandingsTable
+                          standings={group.standings}
+                          highlightParticipantId={seriesRequest.participantId}
+                        />
+                      ) : null}
+                    </div>
+                  )
+                })}
               </div>
             )
-          })}
-        </div>
+          ) : null}
+        </>
       ) : null}
     </div>
   )

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   headToHeadPlaces,
+  standingsRowsForDisplay,
   type AnalyzeSnapshot,
 } from '../../lib/analyzeMetrics'
 import type { AnalyzePanelId } from '../../lib/analyzePanels'
@@ -24,15 +25,6 @@ function fmt(n: number | null | undefined, digits = 1): string {
 
 function NoResults() {
   return <p className="flex min-h-[180px] items-center justify-center text-sm text-zinc-500">No Results</p>
-}
-
-/** All riders with series points (excludes 0-point entries). */
-function standingsRowsForDisplay<T extends { points: number }>(
-  standings: T[],
-): { row: T; rank: number }[] {
-  return standings
-    .filter((row) => row.points > 0)
-    .map((row, index) => ({ row, rank: index + 1 }))
 }
 
 export function AnalyzePanelBody({

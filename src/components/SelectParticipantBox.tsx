@@ -15,7 +15,7 @@ type SelectParticipantBoxProps = {
 }
 
 export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = false }: SelectParticipantBoxProps) {
-  const { selectedParticipant, setSelectedParticipant } = useEventCode()
+  const { context, selectedParticipant, setSelectedParticipant } = useEventCode()
   const ridersQuery = useEventParticipants(eventId)
   const [riderSearch, setRiderSearch] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -50,7 +50,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
       lastName: rider.last_name,
       participantPlate: rider.participant_plate,
     })
-    saveParticipantAsResultsSelection(eventId, rider.participant_id)
+    saveParticipantAsResultsSelection(eventId, rider.participant_id, context?.seriesId)
     setRiderSearch('')
     onOk?.()
   }

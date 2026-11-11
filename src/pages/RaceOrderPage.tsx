@@ -190,6 +190,7 @@ function ClassParticipants({
 
 function RaceRow({
   eventId,
+  seriesId,
   race,
   isParticipantRace,
   participantDisplayName,
@@ -197,6 +198,7 @@ function RaceRow({
   stripSessionPrefix,
 }: {
   eventId: number
+  seriesId: number
   race: EventRaceOrderRow
   isParticipantRace: boolean
   participantDisplayName: string | null
@@ -215,7 +217,7 @@ function RaceRow({
   }
 
   function openRaceResults() {
-    saveRaceAsResultsSelection(eventId, race.race_id)
+    saveRaceAsResultsSelection(eventId, race.race_id, seriesId)
     navigate('/results')
   }
 
@@ -450,6 +452,7 @@ export function RaceOrderPage() {
           <RaceRow
             key={race.race_id}
             eventId={context!.eventId}
+            seriesId={context!.seriesId}
             race={race}
             isParticipantRace={participantRaceIds.has(race.race_id)}
             participantDisplayName={participantDisplayName}

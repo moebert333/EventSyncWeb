@@ -89,7 +89,7 @@ export function AnalyzeContextHeader({
       lastName: rider.last_name,
       participantPlate: rider.participant_plate,
     })
-    saveParticipantAsResultsSelection(eventId, rider.participant_id)
+    saveParticipantAsResultsSelection(eventId, rider.participant_id, context?.seriesId)
     setRiderOpen(false)
     setRiderSearch('')
   }

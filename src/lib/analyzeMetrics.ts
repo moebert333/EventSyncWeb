@@ -264,6 +264,74 @@ export function riderClassNamesFor(
   ].sort((a, b) => a.localeCompare(b))
 }
 
+/** Championship standings per class from series event results. */
+export function computeStandingsByClass(
+  events: SeriesEventRef[],
+  rows: EventClassResult[],
+  participantId: number | null = null,
+): Record<string, StandingRow[]> {
+  const eventById = new Map(events.map((event) => [event.event_id, event]))
+  const classNames = [...new Set(rows.map((row) => row.class_name))].sort((a, b) =>
+    a.localeCompare(b),
+  )
+  const standingsByClass: Record<string, StandingRow[]> = {}
+  for (const className of classNames) {
+    const byRider = new Map<
+      number,
+      {
+        name: string
+        plate: string | null
+        points: number
+        places: number[]
+        events: Set<number>
+      }
+    >()
+    for (const row of rows) {
+      if (row.class_name !== className) continue
+      if (!eventById.has(row.event_id)) continue
+      const current = byRider.get(row.participant_id) ?? {
+        name: riderName(row.first_name, row.last_name),
+        plate: row.participant_plate,
+        points: 0,
+        places: [],
+        events: new Set<number>(),
+      }
+      current.points += row.overall_points ?? 0
+      current.events.add(row.event_id)
+      const place = numericPlace(row.overall_place)
+      if (place != null) current.places.push(place)
+      byRider.set(row.participant_id, current)
+    }
+    standingsByClass[className] = [...byRider.entries()]
+      .map(([id, value]) => ({
+        participantId: id,
+        name: value.name,
+        plate: value.plate,
+        events: value.events.size,
+        points: value.points,
+        bestPlace: value.places.length ? Math.min(...value.places) : null,
+        avgPlace: avg(value.places),
+        isYou: participantId != null && id === participantId,
+      }))
+      .sort(
+        (a, b) =>
+          b.points - a.points ||
+          (a.avgPlace ?? 999) - (b.avgPlace ?? 999) ||
+          a.name.localeCompare(b.name),
+      )
+  }
+  return standingsByClass
+}
+
+/** All riders with series points (excludes 0-point entries), with display ranks. */
+export function standingsRowsForDisplay<T extends { points: number }>(
+  standings: T[],
+): { row: T; rank: number }[] {
+  return standings
+    .filter((row) => row.points > 0)
+    .map((row, index) => ({ row, rank: index + 1 }))
+}
+
 export function buildAnalyzeSnapshot(
   events: SeriesEventRef[],
   rows: EventClassResult[],
@@ -314,53 +382,7 @@ export function buildAnalyzeSnapshot(
     }
   }
 
-  const standingsByClass: Record<string, StandingRow[]> = {}
-  for (const className of classNames) {
-    const byRider = new Map<
-      number,
-      {
-        name: string
-        plate: string | null
-        points: number
-        places: number[]
-        events: Set<number>
-      }
-    >()
-    for (const row of rows) {
-      if (row.class_name !== className) continue
-      if (!eventById.has(row.event_id)) continue
-      const current = byRider.get(row.participant_id) ?? {
-        name: riderName(row.first_name, row.last_name),
-        plate: row.participant_plate,
-        points: 0,
-        places: [],
-        events: new Set<number>(),
-      }
-      current.points += row.overall_points ?? 0
-      current.events.add(row.event_id)
-      const place = numericPlace(row.overall_place)
-      if (place != null) current.places.push(place)
-      byRider.set(row.participant_id, current)
-    }
-    const standings: StandingRow[] = [...byRider.entries()]
-      .map(([id, value]) => ({
-        participantId: id,
-        name: value.name,
-        plate: value.plate,
-        events: value.events.size,
-        points: value.points,
-        bestPlace: value.places.length ? Math.min(...value.places) : null,
-        avgPlace: avg(value.places),
-        isYou: participantId != null && id === participantId,
-      }))
-      .sort(
-        (a, b) =>
-          b.points - a.points ||
-          (a.avgPlace ?? 999) - (b.avgPlace ?? 999) ||
-          a.name.localeCompare(b.name),
-      )
-    standingsByClass[className] = standings
-  }
+  const standingsByClass = computeStandingsByClass(orderedEvents, rows, participantId)
 
   const focusClass = riderClassName ?? classNames[0] ?? null
   const focusStandings = focusClass ? (standingsByClass[focusClass] ?? []) : []
