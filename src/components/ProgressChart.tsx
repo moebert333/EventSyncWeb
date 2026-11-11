@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { pointLabelIndexes } from '../lib/chartPointLabels'
 import { raceTimeSeconds } from '../lib/format'
 import type { LapProgressPoint } from '../lib/progressTracking'
 
@@ -475,6 +476,21 @@ function ProgressPlot({
   const lapStep = axisLaps.length > 16 ? Math.ceil(axisLaps.length / 12) : 1
   const scales = [leftScale, rightScale]
 
+  // Same value-label thinning as Dashboard SimpleLineChart (band width vs sample text width).
+  const firstLap = points[0]?.lap
+  const lastLap = points[points.length - 1]?.lap
+  const bandW =
+    points.length <= 1 || firstLap == null || lastLap == null || firstLap === lastLap
+      ? innerW
+      : Math.abs(xOf(lastLap) - xOf(firstLap)) / (points.length - 1)
+  const sampleLeft =
+    leftValues.length > 0 ? formatMetric(Math.max(...leftValues), left.kind) : '10'
+  const sampleRight =
+    rightValues.length > 0 ? formatMetric(Math.max(...rightValues), right.kind) : '10'
+  const sampleLabel = sampleLeft.length >= sampleRight.length ? sampleLeft : sampleRight
+  const labeledPointIndexes = new Set(pointLabelIndexes(points.length, bandW, sampleLabel))
+  const valueLabelFont = compact ? 11 : 13
+
   const tipFor = (point: PlotPoint, scale: AxisScale): HoverTip | null => {
     const value = scale.read(point)
     if (value == null) return null
@@ -630,26 +646,52 @@ function ProgressPlot({
                 strokeLinecap="round"
               />
             ))}
-            {points.map((point) =>
+            {points.map((point, index) =>
               point.left == null ? null : (
-                <circle
-                  key={`left-${point.lap}`}
-                  cx={xOf(point.lap)}
-                  cy={yOf(leftScale, point.left)}
-                  r={hover?.lap === point.lap && hover.series === 'left' ? 5.5 : 3.5}
-                  fill={LEFT_COLOR}
-                />
+                <g key={`left-${point.lap}`}>
+                  <circle
+                    cx={xOf(point.lap)}
+                    cy={yOf(leftScale, point.left)}
+                    r={hover?.lap === point.lap && hover.series === 'left' ? 5.5 : 3.5}
+                    fill={LEFT_COLOR}
+                  />
+                  {labeledPointIndexes.has(index) ? (
+                    <text
+                      x={xOf(point.lap)}
+                      y={yOf(leftScale, point.left) - 8}
+                      textAnchor="middle"
+                      fill={LEFT_COLOR}
+                      fontSize={valueLabelFont}
+                      fontWeight="700"
+                    >
+                      {formatMetric(point.left, left.kind)}
+                    </text>
+                  ) : null}
+                </g>
               ),
             )}
-            {points.map((point) =>
+            {points.map((point, index) =>
               point.right == null ? null : (
-                <circle
-                  key={`right-${point.lap}`}
-                  cx={xOf(point.lap)}
-                  cy={yOf(rightScale, point.right)}
-                  r={hover?.lap === point.lap && hover.series === 'right' ? 5.5 : 3.5}
-                  fill={RIGHT_COLOR}
-                />
+                <g key={`right-${point.lap}`}>
+                  <circle
+                    cx={xOf(point.lap)}
+                    cy={yOf(rightScale, point.right)}
+                    r={hover?.lap === point.lap && hover.series === 'right' ? 5.5 : 3.5}
+                    fill={RIGHT_COLOR}
+                  />
+                  {labeledPointIndexes.has(index) ? (
+                    <text
+                      x={xOf(point.lap)}
+                      y={yOf(rightScale, point.right) + 14}
+                      textAnchor="middle"
+                      fill={RIGHT_COLOR}
+                      fontSize={valueLabelFont}
+                      fontWeight="700"
+                    >
+                      {formatMetric(point.right, right.kind)}
+                    </text>
+                  ) : null}
+                </g>
               ),
             )}
           </svg>

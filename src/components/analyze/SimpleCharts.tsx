@@ -1,4 +1,5 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
+import { pointLabelIndexes } from '../../lib/chartPointLabels'
 
 type Series = { name: string; data: number[]; color: string }
 
@@ -85,24 +86,6 @@ type LineChartProps = {
   /** Hide the reference value label drawn on the plot (legend can cover it). */
   hideReferenceLabel?: boolean
   className?: string
-}
-
-/** Pick category indexes to label so value text roughly fits without overlapping. */
-function pointLabelIndexes(count: number, bandW: number, sampleLabel = '10'): number[] {
-  if (count <= 0) return []
-  if (count === 1) return [0]
-  const labelW = Math.max(18, sampleLabel.length * 8)
-  const stride = Math.max(1, Math.ceil((labelW + 6) / Math.max(bandW, 1)))
-  const indexes: number[] = []
-  for (let i = 0; i < count; i += stride) indexes.push(i)
-  const last = count - 1
-  if (indexes[indexes.length - 1] !== last) {
-    if (indexes.length > 0 && last - indexes[indexes.length - 1]! < stride) {
-      indexes.pop()
-    }
-    indexes.push(last)
-  }
-  return indexes
 }
 
 export function SimpleLineChart({
