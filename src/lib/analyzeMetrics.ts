@@ -1,3 +1,4 @@
+import { ANALYZE_ADVICE_GUIDELINES } from './analyzeAdviceGuidelines'
 import { placeRank, riderName } from './format'
 import type { EventClassResult, EventRow } from '../types/database'
 
@@ -723,8 +724,11 @@ export function snapshotForAi(
       riders: '[name] or [name, plate]',
       seriesResults: '[eventIdx, classIdx, riderIdx, place, points]',
       standings: 'focusClass series table [{r,n,pts,ev,avg,you?}] — use for closest/gap questions',
+      adviceGuidelines:
+        'General MX diet/training/race-day notes for advice questions — combine with focusRider patterns',
       note: 'Default scope is focusRider + focusClass unless another class/series-wide ask is clear. Motos are on focusRider.results only. For standings proximity, use focusRider.standings (full class), not a top-N guess.',
     },
+    adviceGuidelines: ANALYZE_ADVICE_GUIDELINES,
     events: eventCatalog,
     classes: classNames,
     riders: riderCatalog,

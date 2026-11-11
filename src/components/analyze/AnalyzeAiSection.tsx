@@ -2,20 +2,22 @@ import { useState } from 'react'
 import {
   askAnalyzeAi,
   remainingAiQuestions,
-  type AnalyzeAiChartSpec,
+  type AnalyzeAiBlock,
 } from '../../lib/analyzeAiClient'
 import { SimpleBarChart, SimpleLineChart, SimplePieChart } from './SimpleCharts'
 
 const ADVICE_SUGGESTION = 'Advice to improve my results'
+/** Sent to the model when the Advice chip is picked (chip label stays short). */
+const ADVICE_SUGGESTION_PROMPT =
+  'Advice to improve my results, show table of what a training routine might look like for the next month'
 
 const SUGGESTIONS_FULL = [
+  ADVICE_SUGGESTION,
   'Show my place trend this series',
   'Who am I closest to in the standings?',
-  'What events did my plate race in?',
   'Which class had the biggest field this series?',
   'Who scored the most points in my class?',
   'Compare my moto 1 vs moto 2 average',
-  ADVICE_SUGGESTION,
 ]
 
 const SUGGESTIONS_EARLY = [
@@ -33,38 +35,102 @@ type Props = {
   earlySeries?: boolean
 }
 
-function AiChart({ chart }: { chart: AnalyzeAiChartSpec }) {
-  if (chart.type === 'pie' && chart.slices?.length) {
+function AiTable({ block }: { block: Extract<AnalyzeAiBlock, { type: 'table' }> }) {
+  return (
+    <div className="max-h-64 overflow-auto border border-white/10">
+      <table className="w-full text-left text-sm">
+        <thead className="sticky top-0 bg-[#141414] text-xs uppercase tracking-wide text-zinc-500">
+          <tr>
+            {block.columns.map((column) => (
+              <th key={column} className="whitespace-nowrap px-2 py-1.5 font-semibold">
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="border-t border-white/10 text-zinc-200">
+              {block.columns.map((_, colIndex) => {
+                const cell = row[colIndex]
+                return (
+                  <td key={colIndex} className="whitespace-nowrap px-2 py-1.5">
+                    {cell == null || cell === '' ? '—' : String(cell)}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function AiBlockView({ block }: { block: AnalyzeAiBlock }) {
+  if (block.type === 'table') {
+    return (
+      <div>
+        {block.title ? (
+          <p className="mb-1 text-xs uppercase tracking-wide text-zinc-500">{block.title}</p>
+        ) : null}
+        <AiTable block={block} />
+      </div>
+    )
+  }
+
+  if (block.type === 'pie') {
     const colors = ['#f5c518', '#38bdf8', '#52525b', '#4ade80', '#fbbf24']
     return (
-      <SimplePieChart
-        data={chart.slices.map((slice, index) => ({
-          ...slice,
-          color: colors[index % colors.length]!,
-        }))}
-      />
+      <div>
+        {block.title ? (
+          <p className="mb-1 text-xs uppercase tracking-wide text-zinc-500">{block.title}</p>
+        ) : null}
+        <SimplePieChart
+          data={block.slices.map((slice, index) => ({
+            ...slice,
+            color: colors[index % colors.length]!,
+          }))}
+        />
+      </div>
     )
   }
-  if (chart.type === 'line' && chart.series?.length && chart.categories?.length) {
+
+  if (block.type === 'line') {
     const colors = ['#38bdf8', '#fbbf24', '#4ade80']
     return (
-      <SimpleLineChart
-        categories={chart.categories}
-        series={chart.series.map((item, index) => ({
-          name: item.name,
-          data: item.data,
-          color: colors[index % colors.length]!,
-        }))}
-      />
+      <div>
+        {block.title ? (
+          <p className="mb-1 text-xs uppercase tracking-wide text-zinc-500">{block.title}</p>
+        ) : null}
+        <SimpleLineChart
+          categories={block.categories}
+          series={block.series.map((item, index) => ({
+            name: item.name,
+            data: item.data,
+            color: colors[index % colors.length]!,
+          }))}
+        />
+      </div>
     )
   }
-  if (chart.categories?.length && chart.values?.length) {
-    return <SimpleBarChart categories={chart.categories} values={chart.values} />
-  }
-  if (chart.series?.[0] && chart.categories?.length) {
-    return <SimpleBarChart categories={chart.categories} values={chart.series[0].data} />
-  }
-  return null
+
+  // bar
+  return (
+    <div>
+      {block.title ? (
+        <p className="mb-1 text-xs uppercase tracking-wide text-zinc-500">{block.title}</p>
+      ) : null}
+      <SimpleBarChart
+        categories={block.categories}
+        values={block.values}
+        colors={block.colors}
+        height={220}
+        className="h-auto w-full"
+        showYAxis
+      />
+    </div>
+  )
 }
 
 function defaultAiExpanded(): boolean {
@@ -77,18 +143,17 @@ export function AnalyzeAiSection({ data, enabled, earlySeries = false }: Props) 
   const [moreSuggestions, setMoreSuggestions] = useState(false)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
-  const [chart, setChart] = useState<AnalyzeAiChartSpec | null>(null)
+  const [blocks, setBlocks] = useState<AnalyzeAiBlock[]>([])
   const [canAnswer, setCanAnswer] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [remaining, setRemaining] = useState(() => remainingAiQuestions())
-  const otherSuggestions = (earlySeries ? SUGGESTIONS_EARLY : SUGGESTIONS_FULL).filter(
-    (item) => item !== ADVICE_SUGGESTION,
-  )
+  const suggestions = earlySeries ? SUGGESTIONS_EARLY : SUGGESTIONS_FULL
 
   function runSuggestion(item: string) {
-    setQuestion(item)
-    void submit(item)
+    const prompt = item === ADVICE_SUGGESTION ? ADVICE_SUGGESTION_PROMPT : item
+    setQuestion(prompt)
+    void submit(prompt)
   }
 
   function toggleExpanded() {
@@ -104,12 +169,12 @@ export function AnalyzeAiSection({ data, enabled, earlySeries = false }: Props) 
     setBusy(true)
     setError(null)
     setAnswer(null)
-    setChart(null)
+    setBlocks([])
     setCanAnswer(true)
     try {
       const result = await askAnalyzeAi({ question: trimmed, data })
       setAnswer(result.answer)
-      setChart(result.chart ?? null)
+      setBlocks(result.blocks)
       setCanAnswer(result.canAnswer !== false)
       setExpanded(true)
       setRemaining(remainingAiQuestions())
@@ -162,7 +227,7 @@ export function AnalyzeAiSection({ data, enabled, earlySeries = false }: Props) 
                   : 'flex max-h-[2.25rem] flex-wrap content-start gap-2 overflow-hidden'
               }
             >
-              {otherSuggestions.map((item) => (
+              {suggestions.map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -174,18 +239,8 @@ export function AnalyzeAiSection({ data, enabled, earlySeries = false }: Props) 
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {!earlySeries ? (
-                <button
-                  type="button"
-                  className="w-fit border border-white/15 px-2 py-1 text-left text-xs text-zinc-300 hover:border-[#f5c518]/50 disabled:opacity-50"
-                  disabled={!enabled || busy}
-                  onClick={() => runSuggestion(ADVICE_SUGGESTION)}
-                >
-                  {ADVICE_SUGGESTION}
-                </button>
-              ) : null}
-              {otherSuggestions.length > 0 ? (
+            {suggestions.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   className="w-fit border border-[#f5c518]/40 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[#f5c518] hover:bg-[#f5c518]/10"
@@ -193,8 +248,8 @@ export function AnalyzeAiSection({ data, enabled, earlySeries = false }: Props) 
                 >
                   {moreSuggestions ? 'Less' : 'More'}
                 </button>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
         <form
@@ -232,14 +287,9 @@ export function AnalyzeAiSection({ data, enabled, earlySeries = false }: Props) 
               </p>
             ) : null}
             <p className="text-sm leading-relaxed text-zinc-100">{answer}</p>
-            {chart ? (
-              <div>
-                {chart.title ? (
-                  <p className="mb-1 text-xs uppercase tracking-wide text-zinc-500">{chart.title}</p>
-                ) : null}
-                <AiChart chart={chart} />
-              </div>
-            ) : null}
+            {blocks.map((block, index) => (
+              <AiBlockView key={`${block.type}-${block.title ?? ''}-${index}`} block={block} />
+            ))}
           </div>
         ) : null}
       </div>
