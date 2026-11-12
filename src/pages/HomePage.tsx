@@ -40,8 +40,8 @@ export function HomePage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
-    const ok = await submitCode(draft)
-    if (ok) {
+    const resolved = await submitCode(draft)
+    if (resolved) {
       setDraft('')
       setPromptParticipant(true)
     }
@@ -146,6 +146,7 @@ export function HomePage() {
               {promptParticipant ? (
                 <SelectParticipantBox
                   eventId={context.eventId}
+                  title="Choose your Rider"
                   onOk={onParticipantOk}
                   onSkip={onParticipantSkip}
                   actionsBusy={actionsBusy}

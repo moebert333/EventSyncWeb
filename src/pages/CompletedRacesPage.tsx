@@ -10,6 +10,7 @@ import {
   useEventResults,
   useOrgEvents,
   useOrgSeries,
+  useParticipantResultClassNames,
   type ResultsFilter,
 } from '../hooks/useEventResults'
 import { useSeriesAnalyzeData } from '../hooks/useSeriesAnalyzeData'
@@ -85,9 +86,12 @@ function groupResultsByClass(rows: EventClassResult[]): { className: string; row
   return [...groups.entries()].map(([className, classRows]) => ({ className, rows: classRows }))
 }
 
-function applyParticipantDefault(
+/** Landing default: Filter by Class → first class with posted results for this rider. */
+function applySelectedRiderClassDefault(
   participantId: number,
   eventId: number,
+  className: string,
+  seriesFilter: number | 'all',
   setters: {
     setScope: (scope: ResultsScope) => void
     setMode: (mode: ResultsMode) => void
@@ -100,20 +104,32 @@ function applyParticipantDefault(
     setSelectOpen: (open: boolean) => void
   },
 ) {
+  const request: ResultsFilter = {
+    eventId,
+    className,
+    participantId: null,
+    raceId: null,
+  }
   setters.setScope('event')
-  setters.setMode('participant')
-  setters.setClassName('')
+  setters.setMode('class')
+  setters.setClassName(className)
   setters.setEventId(eventId)
-  setters.setParticipantId(participantId)
+  setters.setParticipantId('')
   setters.setRaceId('')
   setters.setSeriesRequest(null)
-  setters.setRequest({
-    eventId,
-    className: null,
-    participantId,
-    raceId: null,
-  })
+  setters.setRequest(request)
   setters.setSelectOpen(false)
+  saveResultsSelection({
+    scope: 'event',
+    seriesFilter,
+    eventId,
+    mode: 'class',
+    className,
+    participantId: '',
+    raceId: '',
+    request,
+    seriesRequest: null,
+  })
 }
 
 function StandingsTable({
@@ -189,26 +205,28 @@ export function CompletedRacesPage() {
   const [raceId, setRaceId] = useState<number | ''>(savedSelection?.raceId ?? '')
   const [riderSearch, setRiderSearch] = useState('')
   const [filterError, setFilterError] = useState<string | null>(null)
-  const [request, setRequest] = useState<ResultsFilter | null>(
-    savedSelection?.scope === 'series' ? null : (savedSelection?.request ?? null),
-  )
+  const [request, setRequest] = useState<ResultsFilter | null>(() => {
+    if (savedSelection?.scope === 'series') return null
+    // Participant-mode saves are re-resolved to a class with results on landing.
+    if (savedSelection?.mode === 'participant') return null
+    return savedSelection?.request ?? null
+  })
   const [seriesRequest, setSeriesRequest] = useState<SeriesResultsRequest | null>(
     savedSelection?.scope === 'series' ? savedSelection.seriesRequest : null,
   )
-  const [selectOpen, setSelectOpen] = useState(
-    () =>
-      savedSelection == null ||
-      (savedSelection.scope === 'series'
-        ? savedSelection.seriesRequest == null
-        : savedSelection.request == null),
-  )
-  const [defaultApplyDone, setDefaultApplyDone] = useState(
-    () =>
-      savedSelection != null &&
-      (savedSelection.scope === 'series'
-        ? savedSelection.seriesRequest != null
-        : savedSelection.request != null),
-  )
+  const [selectOpen, setSelectOpen] = useState(() => {
+    if (savedSelection == null) return true
+    if (savedSelection.scope === 'series') return savedSelection.seriesRequest == null
+    if (savedSelection.mode === 'participant') return true
+    return savedSelection.request == null
+  })
+  const [defaultApplyDone, setDefaultApplyDone] = useState(() => {
+    if (savedSelection == null) return false
+    if (savedSelection.scope === 'series') return savedSelection.seriesRequest != null
+    // Resolve selected-rider landing to first class with results instead of participant filter.
+    if (savedSelection.mode === 'participant') return false
+    return savedSelection.request != null
+  })
   const [savedInvalidated, setSavedInvalidated] = useState(false)
   const [collapsedClasses, setCollapsedClasses] = useState<Set<string>>(() => new Set())
 
@@ -281,11 +299,21 @@ export function CompletedRacesPage() {
     }
   }, [scope, racesQuery.isSuccess, racesQuery.data, raceId, request?.raceId])
 
-  if (!context) return null
-  const eventContext = context
+  const landingParticipantId =
+    !defaultApplyDone &&
+    selectedParticipant &&
+    selectedParticipant.eventId === (context?.eventId ?? -1)
+      ? selectedParticipant.participantId
+      : null
+  const riderResultClassesQuery = useParticipantResultClassNames(
+    landingParticipantId != null ? (context?.eventId ?? null) : null,
+    landingParticipantId,
+  )
 
   // Drop a stored selection that no longer matches available series/events.
-  if (!savedInvalidated && savedSelection && eventsQuery.isSuccess && seriesQuery.isSuccess) {
+  useEffect(() => {
+    if (savedInvalidated || !savedSelection) return
+    if (!eventsQuery.isSuccess || !seriesQuery.isSuccess) return
     const eventMissing =
       savedSelection.scope !== 'series' &&
       !(eventsQuery.data ?? []).some((event) => event.event_id === savedSelection.eventId)
@@ -293,41 +321,71 @@ export function CompletedRacesPage() {
       savedSelection.scope === 'series' &&
       (typeof savedSelection.seriesFilter !== 'number' ||
         !(seriesQuery.data ?? []).some((series) => series.series_id === savedSelection.seriesFilter))
-    if (eventMissing || seriesMissing) {
-      clearResultsSelection()
-      setSavedInvalidated(true)
-      setRequest(null)
-      setSeriesRequest(null)
-      setDefaultApplyDone(false)
-      setSelectOpen(true)
-    }
-  }
+    if (!eventMissing && !seriesMissing) return
+    clearResultsSelection()
+    setSavedInvalidated(true)
+    setRequest(null)
+    setSeriesRequest(null)
+    setDefaultApplyDone(false)
+    setSelectOpen(true)
+  }, [
+    savedInvalidated,
+    savedSelection,
+    eventsQuery.isSuccess,
+    eventsQuery.data,
+    seriesQuery.isSuccess,
+    seriesQuery.data,
+  ])
 
-  if (!defaultApplyDone && loadResultsSelection() == null) {
+  // Initial landing: first class with posted results for the selected rider.
+  useEffect(() => {
+    if (defaultApplyDone || !context) return
     const current =
-      selectedParticipant && selectedParticipant.eventId === eventContext.eventId
+      selectedParticipant && selectedParticipant.eventId === context.eventId
         ? selectedParticipant
         : null
-    if (current) {
+    if (!current) {
       setDefaultApplyDone(true)
-      setSeriesFilter(eventContext.seriesId)
-      applyParticipantDefault(current.participantId, current.eventId, {
-        setScope,
-        setMode,
-        setClassName,
-        setEventId,
-        setParticipantId,
-        setRaceId,
-        setRequest,
-        setSeriesRequest,
-        setSelectOpen,
-      })
-    } else {
-      setDefaultApplyDone(true)
-      setSeriesFilter(eventContext.seriesId)
+      setSeriesFilter(context.seriesId)
       setSelectOpen(true)
+      return
     }
-  }
+    if (riderResultClassesQuery.isError) {
+      setDefaultApplyDone(true)
+      setSeriesFilter(context.seriesId)
+      setSelectOpen(true)
+      return
+    }
+    if (!riderResultClassesQuery.isSuccess) return
+    const firstClass = riderResultClassesQuery.data[0] ?? null
+    setDefaultApplyDone(true)
+    setSeriesFilter(context.seriesId)
+    if (firstClass == null) {
+      setSelectOpen(true)
+      return
+    }
+    applySelectedRiderClassDefault(current.participantId, current.eventId, firstClass, context.seriesId, {
+      setScope,
+      setMode,
+      setClassName,
+      setEventId,
+      setParticipantId,
+      setRaceId,
+      setRequest,
+      setSeriesRequest,
+      setSelectOpen,
+    })
+  }, [
+    defaultApplyDone,
+    context,
+    selectedParticipant,
+    riderResultClassesQuery.isSuccess,
+    riderResultClassesQuery.isError,
+    riderResultClassesQuery.data,
+  ])
+
+  if (!context) return null
+  const eventContext = context
 
   const needle = riderSearch.trim().toLowerCase()
   const riderSource = scope === 'series' ? seriesRiders : (ridersQuery.data ?? [])
@@ -570,7 +628,7 @@ export function CompletedRacesPage() {
         pageTitle="Event Results"
         onParticipantChanged={() => {
           const saved = loadResultsSelection()
-          // Selecting a participant in the picker also updates Results selection (event scope).
+          // Picker writes participant mode; re-resolve to first class with results for that rider.
           if (
             saved?.scope === 'event' &&
             saved.mode === 'participant' &&
@@ -579,14 +637,14 @@ export function CompletedRacesPage() {
             setScope('event')
             setSeriesFilter(saved.seriesFilter === 'all' ? context.seriesId : saved.seriesFilter)
             setEventId(saved.eventId)
-            setMode('participant')
+            setMode('class')
             setClassName('')
-            setParticipantId(saved.participantId)
+            setParticipantId('')
             setRaceId('')
             setSeriesRequest(null)
-            setRequest(saved.request)
-            setSelectOpen(false)
-            setDefaultApplyDone(true)
+            setRequest(null)
+            setSelectOpen(true)
+            setDefaultApplyDone(false)
             return
           }
           if (saved == null) setDefaultApplyDone(false)

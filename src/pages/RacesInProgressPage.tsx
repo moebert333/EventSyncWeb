@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { Link } from 'react-router-dom'
 import { ChartIcon, ProgressTrackingChart } from '../components/ProgressChart'
 import { EventParticipantHeader } from '../components/EventParticipantHeader'
+import { RaceActivityIcon } from '../components/RaceActivityIcon'
 import { RaceStatusVideo, VideoIcon, raceStatusVideoSrc } from '../components/RaceStatusVideo'
 import { Skeleton } from '../components/Skeleton'
 import { StatusPill } from '../components/StatusPill'
@@ -743,7 +744,12 @@ export function RacesInProgressPage() {
         <EventParticipantHeader
           eventId={context.eventId}
           eventName={race.event_name || context.eventName}
-          pageTitle={formatActiveSessionTitle(race.race_num, race.is_practice)}
+          pageTitle={
+            <span className="inline-flex items-center gap-1.5">
+              {formatActiveSessionTitle(race.race_num, race.is_practice)}
+              <RaceActivityIcon status={race.status} />
+            </span>
+          }
           onParticipantChanged={() => {
             appliedParticipantRaceRef.current = null
           }}

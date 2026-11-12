@@ -69,9 +69,12 @@ function raceTone(
 function ClassParticipants({
   eventId,
   raceClass,
+  onRiderSelected,
 }: {
   eventId: number
   raceClass: EventRaceOrderClass
+  /** Collapse the parent race row’s expanded class list after Confirm. */
+  onRiderSelected?: () => void
 }) {
   const { selectedParticipant, setSelectedParticipant } = useEventCode()
   const ridersQuery = useClassParticipants(eventId, raceClass.class_id)
@@ -95,6 +98,7 @@ function ClassParticipants({
       participantPlate: pendingRider.participant_plate,
     })
     setPendingRider(null)
+    onRiderSelected?.()
   }
 
   const pendingName = pendingRider
@@ -335,7 +339,12 @@ function RaceRow({
         ) : null}
       </div>
       {openClasses.map((raceClass) => (
-        <ClassParticipants key={raceClass.class_id} eventId={eventId} raceClass={raceClass} />
+        <ClassParticipants
+          key={raceClass.class_id}
+          eventId={eventId}
+          raceClass={raceClass}
+          onRiderSelected={() => setOpenClassIds([])}
+        />
       ))}
     </li>
   )

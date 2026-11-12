@@ -91,7 +91,7 @@ export function EventParticipantHeader({
             ? 'Hide Event, Rider, and Demo banner'
             : 'Hide Event and Rider'
       }
-      className={`${sticky ? `sticky ${STICKY_TOP}` : 'relative'} z-20 -mx-4 -mt-6 cursor-pointer border-b border-[#f5c518]/35 bg-[#252525] px-4 py-2 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]`}
+      className={`${sticky ? `sticky ${STICKY_TOP}` : 'relative'} z-20 -mx-4 -mt-6 cursor-pointer border-b-2 border-[#f5c518]/85 bg-[#252525] px-4 py-2 shadow-[0_1px_0_rgb(0_0_0_/_0.4)]`}
       onClick={() => toggleEventHeaderCollapsed()}
     >
       <div className="space-y-1">
@@ -133,8 +133,10 @@ export function EventParticipantHeader({
             </span>
           </div>
         ) : null}
-        <p className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-lg font-bold leading-tight">
-          <span className="shrink-0 text-xl font-bold leading-tight text-green-500">{pageTitle}</span>
+        <p className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-lg font-bold leading-tight">
+          <span className="inline-flex shrink-0 items-center text-xl font-bold leading-tight text-green-500">
+            {pageTitle}
+          </span>
           {statusDetail ? (
             <Link
               to="/order"

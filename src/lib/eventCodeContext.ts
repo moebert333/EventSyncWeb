@@ -8,7 +8,8 @@ export type EventCodeApi = {
   setSelectedParticipant: (participant: StoredSelectedParticipant | null) => void
   error: string | null
   resolving: boolean
-  submitCode: (raw: string) => Promise<boolean>
+  /** Resolved context on success; `null` when the code was rejected or lookup failed. */
+  submitCode: (raw: string) => Promise<StoredEventContext | null>
   clearError: () => void
 }
 

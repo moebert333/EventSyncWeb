@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom'
 import {
   toggleEventHeaderCollapsed,
   useEventHeaderCollapsed,
@@ -5,10 +6,14 @@ import {
 import { formatRaceTitle } from '../lib/format'
 import { useSimulation } from '../lib/simulationContext'
 
+const LIVE_PATH = '/live'
+
 export function SimulationBanner() {
+  const location = useLocation()
   const { isActive, isPaused, isDemoMode, raceInProgress, pause, resume, stop } = useSimulation()
   const [headerCollapsed] = useEventHeaderCollapsed()
-  // Demo banner follows the Event/Rider strip collapse; manual sim banner stays visible.
+  // Only on Active Race; demo banner also follows Event/Rider strip collapse.
+  if (location.pathname !== LIVE_PATH) return null
   if (!isActive || !raceInProgress) return null
   if (isDemoMode && headerCollapsed) return null
 

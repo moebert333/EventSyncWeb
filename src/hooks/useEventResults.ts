@@ -103,6 +103,71 @@ export function useEventClasses(eventId: number | null) {
   })
 }
 
+/** True when a results row has any posted place (overall or a single moto/race is enough). */
+function resultRowHasPostedPlace(row: {
+  overall_place: string | number | null
+  race1_place: string | number | null
+  race2_place: string | number | null
+  race3_place: string | number | null
+  semi1_place: string | number | null
+  semi2_place: string | number | null
+  lcq_place: string | number | null
+  finals_place: string | number | null
+}): boolean {
+  const fields = [
+    row.overall_place,
+    row.race1_place,
+    row.race2_place,
+    row.race3_place,
+    row.semi1_place,
+    row.semi2_place,
+    row.lcq_place,
+    row.finals_place,
+  ]
+  return fields.some((value) => value != null && String(value).trim() !== '')
+}
+
+/**
+ * Class names for an event where this participant has at least one posted result
+ * (overall or any moto/semi/LCQ/final), sorted by name.
+ */
+export function useParticipantResultClassNames(
+  eventId: number | null,
+  participantId: number | null,
+) {
+  return useQuery({
+    queryKey: ['participant-result-classes', eventId, participantId],
+    enabled: eventId != null && participantId != null,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('event_class_results')
+        .select(
+          'class_name, overall_place, race1_place, race2_place, race3_place, semi1_place, semi2_place, lcq_place, finals_place',
+        )
+        .eq('event_id', eventId!)
+        .eq('participant_id', participantId!)
+      if (error) throw error
+      type ResultClassRow = {
+        class_name: string
+        overall_place: string | number | null
+        race1_place: string | number | null
+        race2_place: string | number | null
+        race3_place: string | number | null
+        semi1_place: string | number | null
+        semi2_place: string | number | null
+        lcq_place: string | number | null
+        finals_place: string | number | null
+      }
+      const names = new Set<string>()
+      for (const row of (data ?? []) as ResultClassRow[]) {
+        if (!resultRowHasPostedPlace(row)) continue
+        names.add(row.class_name)
+      }
+      return [...names].sort((a, b) => a.localeCompare(b))
+    },
+  })
+}
+
 export function useEventParticipants(eventId: number | null) {
   return useQuery({
     queryKey: ['event-participants', eventId],

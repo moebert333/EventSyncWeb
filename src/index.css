@@ -182,3 +182,21 @@ table.data tbody tr.is-selected.is-leader:hover td {
 .staging-flash {
   animation: staging-flash 0.9s ease-in-out infinite;
 }
+
+/* Active status: faint track “trail” draw behind the moving dot */
+@keyframes race-track-draw {
+  0% {
+    stroke-dasharray: 0 1;
+  }
+  45% {
+    stroke-dasharray: 0.55 1;
+  }
+  100% {
+    stroke-dasharray: 0 1;
+  }
+}
+
+.race-activity-icon.is-active .race-activity-track {
+  stroke-dashoffset: 0;
+  animation: race-track-draw 3.6s linear infinite;
+}

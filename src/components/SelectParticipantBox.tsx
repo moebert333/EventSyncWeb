@@ -8,13 +8,21 @@ import type { EntryParticipant } from '../types/database'
 
 type SelectParticipantBoxProps = {
   eventId: number
+  /** Dialog heading. Defaults to “Select rider (optional)”. */
+  title?: string
   /** When set, show Ok / Skip under the rider picker. */
   onOk?: () => void
   onSkip?: () => void
   actionsBusy?: boolean
 }
 
-export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = false }: SelectParticipantBoxProps) {
+export function SelectParticipantBox({
+  eventId,
+  title,
+  onOk,
+  onSkip,
+  actionsBusy = false,
+}: SelectParticipantBoxProps) {
   const { context, selectedParticipant, setSelectedParticipant } = useEventCode()
   const ridersQuery = useEventParticipants(eventId)
   const [riderSearch, setRiderSearch] = useState('')
@@ -75,7 +83,7 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-20"
       role="dialog"
       aria-modal="true"
-      aria-label="Select rider"
+      aria-label={title ?? 'Select rider'}
       onKeyDown={(event) => {
         if (event.key !== 'Enter') return
         // Rider list buttons already confirm on activation.
@@ -91,7 +99,13 @@ export function SelectParticipantBox({ eventId, onOk, onSkip, actionsBusy = fals
     >
       <div className="grid w-full max-w-lg gap-3 border border-[#f5c518] bg-[#1a1a1a] p-4 shadow-lg">
         <p className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
-          Select rider <span className="normal-case tracking-normal text-zinc-500">(optional)</span>
+          {title ? (
+            title
+          ) : (
+            <>
+              Select rider <span className="normal-case tracking-normal text-zinc-500">(optional)</span>
+            </>
+          )}
         </p>
         <label className="block text-sm uppercase tracking-wide text-zinc-400">
           Search name or plate

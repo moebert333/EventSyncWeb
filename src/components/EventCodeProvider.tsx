@@ -74,14 +74,14 @@ export function EventCodeProvider({ children }: { children: ReactNode }) {
     const code = raw.trim()
     if (!isEventCodeShape(code)) {
       setError('Event Codes are 4–12 characters.')
-      return false
+      return null
     }
     setResolving(true)
     try {
       const resolved = await resolveEventCode(code)
       if (!resolved) {
         setError('That Event Code was not found')
-        return false
+        return null
       }
       const previousEventId = loadEventContext()?.eventId
       saveEventContext(resolved)
@@ -93,10 +93,10 @@ export function EventCodeProvider({ children }: { children: ReactNode }) {
         setSelectedParticipantState(participantForEvent(loadSelectedParticipant(), resolved.eventId))
       }
       setError(null)
-      return true
+      return resolved
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not look up that Event Code.')
-      return false
+      return null
     } finally {
       setResolving(false)
     }
