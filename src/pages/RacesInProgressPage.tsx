@@ -268,8 +268,15 @@ let rememberedRaceStatus: RaceStatus | null = null
 let rememberedAutoChartKey: string | null = null
 let autoChartSimGen = 0
 let lastSeenSimulatingForAutoChart = false
+/**
+ * Rider row click before 2 laps: keep selection, open chart once that rider reaches 2 laps.
+ * Value is `classId-participantId`.
+ */
+let pendingChartRiderKey: string | null = null
 
 const AUTO_CHART_AFTER_LAPS = 3
+/** Open chart for a clicked rider once they have this many laps. */
+const CHART_READY_LAPS = 2
 
 export function RacesInProgressPage() {
   const { context, selectedParticipant } = useEventCode()
@@ -418,6 +425,7 @@ export function RacesInProgressPage() {
     if (raceChanged) {
       rememberedPanelEventId = eventId
       rememberedPanelRaceId = raceId
+      pendingChartRiderKey = null
     }
   }
 
@@ -522,11 +530,24 @@ export function RacesInProgressPage() {
     const autoChartKey = simulating ? `sim:${autoChartSimGen}` : `live:${raceId}`
     if (rememberedAutoChartKey === autoChartKey) return
     rememberedAutoChartKey = autoChartKey
+    pendingChartRiderKey = null
     rememberedChartOpen = true
     rememberedVideoOpen = false
     setChartOpen(true)
     setVideoOpen(false)
   }, [raceId, simulating, autoChartSimGen, raceMaxLap])
+
+  // Row click before 2 laps: open chart once the remembered rider reaches 2 laps.
+  useEffect(() => {
+    if (pendingChartRiderKey == null) return
+    const row = timingRows.find((entry) => rowKey(entry) === pendingChartRiderKey)
+    if (row == null || (row.current_lap_num ?? 0) < CHART_READY_LAPS) return
+    pendingChartRiderKey = null
+    rememberedChartOpen = true
+    rememberedVideoOpen = false
+    setChartOpen(true)
+    setVideoOpen(false)
+  }, [timingRows])
 
   if (!context) return null
 
@@ -714,6 +735,23 @@ export function RacesInProgressPage() {
     ? lapPointsForParticipant(allTimingRows, chartRow.class_id, chartRow.participant_id)
     : []
   const hasStatusVideo = raceStatusVideoSrc(race.status) != null
+
+  function selectRiderForChart(key: string, laps: number) {
+    rememberedSelectedKey = key
+    rememberedSelectedClasses = selectedVisible
+    setSelectedKey(key)
+    if (laps >= CHART_READY_LAPS) {
+      pendingChartRiderKey = null
+      rememberedChartOpen = true
+      rememberedVideoOpen = false
+      setChartOpen(true)
+      setVideoOpen(false)
+      return
+    }
+    // Fewer than 2 laps: keep selection; open chart once this rider reaches 2 laps.
+    pendingChartRiderKey = key
+  }
+
   /** Selecting one panel deselects the other; unselecting leaves the other alone. */
   const toggleChart = () => {
     if (chartOpen) {
@@ -721,6 +759,7 @@ export function RacesInProgressPage() {
       setChartOpen(false)
       return
     }
+    pendingChartRiderKey = null
     rememberedChartOpen = true
     rememberedVideoOpen = false
     setChartOpen(true)
@@ -983,16 +1022,12 @@ export function RacesInProgressPage() {
                         aria-selected={selected}
                         title={`Select ${riderName(row.first_name, row.last_name)} for the chart`}
                         onClick={() => {
-                          rememberedSelectedKey = key
-                          rememberedSelectedClasses = selectedVisible
-                          setSelectedKey(key)
+                          selectRiderForChart(key, row.current_lap_num ?? 0)
                         }}
                         onKeyDown={(event) => {
                           if (event.key !== 'Enter' && event.key !== ' ') return
                           event.preventDefault()
-                          rememberedSelectedKey = key
-                          rememberedSelectedClasses = selectedVisible
-                          setSelectedKey(key)
+                          selectRiderForChart(key, row.current_lap_num ?? 0)
                         }}
                       >
                         {tableColumns.map((column) => (

@@ -127,11 +127,10 @@ export function HomePage() {
             <div className="mt-6 max-w-lg space-y-4">
               <button
                 type="button"
-                className="inline-flex w-full cursor-pointer flex-col gap-1 border border-[#f5c518] bg-transparent px-4 py-3 text-left disabled:cursor-wait"
-                aria-label={`Open ${context.eventName}`}
-                title="Open live timing or results for this event"
-                disabled={raceQuery.isLoading}
-                onClick={goAfterParticipantStep}
+                className="inline-flex w-full cursor-pointer flex-col gap-1 border border-[#f5c518] bg-transparent px-4 py-3 text-left"
+                aria-label={`Select rider for ${context.eventName}`}
+                title="Choose your rider for this event"
+                onClick={() => setPromptParticipant(true)}
               >
                 <span className="font-display text-2xl font-bold uppercase">{context.organizationName}</span>
                 <span className="text-lg">{context.eventName}</span>
