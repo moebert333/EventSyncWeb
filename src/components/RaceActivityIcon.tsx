@@ -142,8 +142,8 @@ export function RaceActivityIcon({ status }: RaceActivityIconProps) {
       }`}
       viewBox="0 0 24 24"
       aria-hidden="true"
-      title={iconTitle(normalized)}
     >
+      <title>{iconTitle(normalized)}</title>
       {mark}
     </svg>
   )

@@ -88,7 +88,6 @@ function groupResultsByClass(rows: EventClassResult[]): { className: string; row
 
 /** Landing default: Filter by Class → first class with posted results for this rider. */
 function applySelectedRiderClassDefault(
-  participantId: number,
   eventId: number,
   className: string,
   seriesFilter: number | 'all',
@@ -364,7 +363,7 @@ export function CompletedRacesPage() {
       setSelectOpen(true)
       return
     }
-    applySelectedRiderClassDefault(current.participantId, current.eventId, firstClass, context.seriesId, {
+    applySelectedRiderClassDefault(current.eventId, firstClass, context.seriesId, {
       setScope,
       setMode,
       setClassName,
