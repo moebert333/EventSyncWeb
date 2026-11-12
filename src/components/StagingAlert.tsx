@@ -73,6 +73,12 @@ export function StagingAlert() {
     void notifyStaging(label, urgent)
   }, [open, label, urgent, alertKey, notifiedFor])
 
+  useEffect(() => {
+    if (!open || alertKey == null) return
+    const timer = window.setTimeout(() => setDismissedFor(alertKey), 2000)
+    return () => window.clearTimeout(timer)
+  }, [open, alertKey])
+
   if (onHome || !open || label == null || urgent == null || alertKey == null) return null
 
   return (
