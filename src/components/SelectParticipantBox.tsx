@@ -44,11 +44,16 @@ export function SelectParticipantBox({
     selectedParticipant?.eventId === eventId ? selectedParticipant : null
 
   const needle = riderSearch.trim().toLowerCase()
-  const riders = (ridersQuery.data ?? []).filter((rider) => {
+  const allRiders = ridersQuery.data ?? []
+  const riders = allRiders.filter((rider) => {
     if (!needle) return true
     return `${rider.first_name} ${rider.last_name} ${rider.participant_plate ?? ''}`.toLowerCase().includes(needle)
   })
   const listOpen = needle.length > 0
+  // Before a choice or search: show the first rider as the dropdown default.
+  const defaultRider =
+    selectedForEvent == null && !listOpen && allRiders.length > 0 ? allRiders[0]! : null
+  const selectValue = selectedForEvent?.participantId ?? defaultRider?.participant_id ?? ''
 
   function chooseRider(rider: EntryParticipant) {
     setSelectedParticipant({
@@ -65,8 +70,17 @@ export function SelectParticipantBox({
 
   function confirmOk() {
     if (actionsBusy || !onOk) return
-    if (riders.length === 1) {
-      chooseRider(riders[0])
+    if (selectedForEvent) {
+      onOk()
+      return
+    }
+    const fallback = listOpen
+      ? riders.length === 1
+        ? riders[0]
+        : null
+      : (defaultRider ?? allRiders[0] ?? null)
+    if (fallback) {
+      chooseRider(fallback)
       return
     }
     onOk()
@@ -75,7 +89,7 @@ export function SelectParticipantBox({
   function selectFirstFromSearch() {
     if (actionsBusy) return
     if (!needle || riders.length === 0) return
-    chooseRider(riders[0])
+    chooseRider(riders[0]!)
   }
 
   const panel = (
@@ -161,14 +175,14 @@ export function SelectParticipantBox({
             <select
               className="control mt-1"
               title="Choose a rider for this event"
-              value={selectedForEvent?.participantId ?? ''}
+              value={selectValue === '' ? '' : String(selectValue)}
               onChange={(event) => {
                 const nextId = event.target.value ? Number(event.target.value) : null
                 if (nextId == null) {
                   setSelectedParticipant(null)
                   return
                 }
-                const rider = (ridersQuery.data ?? []).find((row) => row.participant_id === nextId)
+                const rider = allRiders.find((row) => row.participant_id === nextId)
                 if (!rider) {
                   setSelectedParticipant(null)
                   return
