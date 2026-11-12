@@ -12,7 +12,7 @@ export const SWIPE_NAV_PAGES = [
 ] as const
 
 /** Minimum horizontal travel for a definitive swipe (px). */
-const MIN_SWIPE_DX = 96
+const MIN_SWIPE_DX = 110
 /** Vertical motion may not exceed this share of |dx|. */
 const MAX_DY_RATIO = 0.45
 /**
@@ -68,10 +68,17 @@ export function useSwipePageNav() {
     t: number
     target: EventTarget | null
   } | null>(null)
+  /** Swallow the synthetic click that follows a swipe ending on a <Link>/button (e.g. Home → Race Order). */
+  const suppressClickRef = useRef(false)
   const pathRef = useRef(location.pathname)
   pathRef.current = location.pathname
 
   useEffect(() => {
+    function go(path: (typeof SWIPE_NAV_PAGES)[number]) {
+      suppressClickRef.current = true
+      navigate(path, { state: navigateStateFor(path) })
+    }
+
     function onTouchStart(event: TouchEvent) {
       if (event.touches.length !== 1) {
         startRef.current = null
@@ -129,29 +136,36 @@ export function useSwipePageNav() {
       if (dx > 0) {
         // Swipe toward right → previous page
         if (index <= 0) return
-        const path = SWIPE_NAV_PAGES[index - 1]!
-        navigate(path, { state: navigateStateFor(path) })
+        go(SWIPE_NAV_PAGES[index - 1]!)
         return
       }
       // Swipe toward left → next page
       if (index >= SWIPE_NAV_PAGES.length - 1) return
-      const path = SWIPE_NAV_PAGES[index + 1]!
-      navigate(path, { state: navigateStateFor(path) })
+      go(SWIPE_NAV_PAGES[index + 1]!)
     }
 
     function onTouchCancel() {
       startRef.current = null
     }
 
+    function onClickCapture(event: MouseEvent) {
+      if (!suppressClickRef.current) return
+      suppressClickRef.current = false
+      event.preventDefault()
+      event.stopPropagation()
+    }
+
     document.addEventListener('touchstart', onTouchStart, { passive: true })
     document.addEventListener('touchmove', onTouchMove, { passive: true })
     document.addEventListener('touchend', onTouchEnd, { passive: true })
     document.addEventListener('touchcancel', onTouchCancel, { passive: true })
+    document.addEventListener('click', onClickCapture, true)
     return () => {
       document.removeEventListener('touchstart', onTouchStart)
       document.removeEventListener('touchmove', onTouchMove)
       document.removeEventListener('touchend', onTouchEnd)
       document.removeEventListener('touchcancel', onTouchCancel)
+      document.removeEventListener('click', onClickCapture, true)
     }
   }, [navigate])
 }
