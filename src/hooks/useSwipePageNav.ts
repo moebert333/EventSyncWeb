@@ -43,10 +43,6 @@ function findHorizScrollParent(el: Element | null): HTMLElement | null {
   return null
 }
 
-function dialogOpen(): boolean {
-  return document.querySelector('[role="dialog"]') != null
-}
-
 function navigateStateFor(path: (typeof SWIPE_NAV_PAGES)[number]) {
   // Race Order auto-opens the next-race toast on visit; skip that for swipe arrivals.
   if (path === '/order') return { skipProgressPopup: true }
@@ -56,6 +52,7 @@ function navigateStateFor(path: (typeof SWIPE_NAV_PAGES)[number]) {
 /**
  * Mobile: swipe right → previous page, swipe left → next page.
  * Requires a clear horizontal gesture; does not wrap at ends.
+ * Popups/dialogs do not block page swipes.
  *
  * Over horizontal scrollers: page nav only on a fast flick (velocity threshold).
  */
@@ -84,10 +81,6 @@ export function useSwipePageNav() {
         startRef.current = null
         return
       }
-      if (dialogOpen()) {
-        startRef.current = null
-        return
-      }
       const touch = event.touches[0]
       if (!touch) return
       startRef.current = {
@@ -110,7 +103,6 @@ export function useSwipePageNav() {
       const start = startRef.current
       startRef.current = null
       if (start == null) return
-      if (dialogOpen()) return
 
       const touch = event.changedTouches[0]
       if (!touch) return

@@ -14,6 +14,9 @@ type UrgentLevel = 0 | 1 | 2 | 'inThisRace'
 export function StagingAlert() {
   const location = useLocation()
   const onHome = location.pathname === '/'
+  // Swipe / header status → Race Order: same message is already on-page; don't overlay.
+  const skipPopup =
+    (location.state as { skipProgressPopup?: boolean } | null)?.skipProgressPopup === true
   const { context, selectedParticipant } = useEventCode()
   const [dismissedFor, setDismissedFor] = useState<string | null>(null)
   const [notifiedFor, setNotifiedFor] = useState<string | null>(null)
@@ -51,7 +54,7 @@ export function StagingAlert() {
     !onHome && urgent != null && label != null && activeRaceId != null
       ? `${activeRaceId}:${urgent}:${label}`
       : null
-  const open = alertKey != null && dismissedFor !== alertKey
+  const open = alertKey != null && dismissedFor !== alertKey && !skipPopup
   // Flash only when in Staging (0) or in Active/Paused ('inThisRace'). 1–2 away is solid yellow.
   const flash = urgent === 0 || urgent === 'inThisRace'
 

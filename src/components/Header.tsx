@@ -11,6 +11,12 @@ const links = [
   { to: '/stream', label: 'Live Stream', title: 'View live stream (coming soon)', end: false },
 ]
 
+/** Page title shown beside the brand when banner menu items are hidden. */
+function pageTitleForPath(pathname: string): string | null {
+  if (pathname === '/') return 'Home'
+  return links.find((link) => link.to === pathname)?.label ?? null
+}
+
 /** Hold duration to open simulation (touch / pointer analogue to Ctrl+click). */
 const SIM_LONG_PRESS_MS = 1800
 /** Cancel brand long-press only after the pointer moves this far (px). */
@@ -57,6 +63,8 @@ export function Header() {
   const bannerLinks = visibleCount >= 2 ? links.slice(0, visibleCount) : []
   const overflowLinks = links.filter((link) => !bannerLinks.some((shown) => shown.to === link.to))
   const needsHamburger = overflowLinks.length > 0
+  const menuBarHidden = bannerLinks.length === 0
+  const compactPageTitle = menuBarHidden ? pageTitleForPath(location.pathname) : null
 
   useEffect(() => {
     setMenuPath(null)
@@ -160,58 +168,70 @@ export function Header() {
         ref={rowRef}
         className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-2"
       >
-        <NavLink
-          ref={brandRef}
-          to="/"
-          className="flex min-h-11 shrink-0 touch-manipulation items-center gap-2 select-none"
-          title={
-            demoEvent
-              ? 'Go to Home'
-              : brandLongPressEnabled
-                ? 'Go to Home (Ctrl+click or long-press for race simulation)'
-                : 'Go to Home (Ctrl+click or long-press on Active Race for simulation)'
-          }
-          onClick={(event) => {
-            if (suppressBrandClick.current) {
-              event.preventDefault()
-              event.stopPropagation()
-              suppressBrandClick.current = false
-              return
+        <div className="flex min-w-0 items-center">
+          <NavLink
+            ref={brandRef}
+            to="/"
+            className="flex min-h-11 shrink-0 touch-manipulation items-center gap-2 select-none"
+            title={
+              demoEvent
+                ? 'Go to Home'
+                : brandLongPressEnabled
+                  ? 'Go to Home (Ctrl+click or long-press for race simulation)'
+                  : 'Go to Home (Ctrl+click or long-press on Active Race for simulation)'
             }
-            if (!event.ctrlKey || !simulation || demoEvent) return
-            openSimulationFromBrand(event)
-          }}
-          onPointerDown={(event) => {
-            if (!brandLongPressEnabled || event.button !== 0) return
-            clearLongPress()
-            longPressOrigin.current = { x: event.clientX, y: event.clientY }
-            longPressTimer.current = window.setTimeout(() => {
-              longPressTimer.current = null
-              longPressOrigin.current = null
-              suppressBrandClick.current = true
-              simulation.openDialog()
-            }, SIM_LONG_PRESS_MS)
-          }}
-          onPointerMove={(event) => {
-            const origin = longPressOrigin.current
-            if (origin == null) return
-            if (
-              Math.hypot(event.clientX - origin.x, event.clientY - origin.y) >
-              SIM_LONG_PRESS_MOVE_CANCEL_PX
-            ) {
+            onClick={(event) => {
+              if (suppressBrandClick.current) {
+                event.preventDefault()
+                event.stopPropagation()
+                suppressBrandClick.current = false
+                return
+              }
+              if (!event.ctrlKey || !simulation || demoEvent) return
+              openSimulationFromBrand(event)
+            }}
+            onPointerDown={(event) => {
+              if (!brandLongPressEnabled || event.button !== 0) return
               clearLongPress()
-            }
-          }}
-          onPointerUp={clearLongPress}
-          onPointerCancel={clearLongPress}
-          onContextMenu={(event) => {
-            // Avoid the native callout stealing a long-press meant for simulation.
-            if (brandLongPressEnabled) event.preventDefault()
-          }}
-        >
-          <img src="/rider.svg" alt="" className="h-10 w-14" draggable={false} />
-          <span className="font-display text-2xl font-extrabold uppercase tracking-wide">Event Sync</span>
-        </NavLink>
+              longPressOrigin.current = { x: event.clientX, y: event.clientY }
+              longPressTimer.current = window.setTimeout(() => {
+                longPressTimer.current = null
+                longPressOrigin.current = null
+                suppressBrandClick.current = true
+                simulation.openDialog()
+              }, SIM_LONG_PRESS_MS)
+            }}
+            onPointerMove={(event) => {
+              const origin = longPressOrigin.current
+              if (origin == null) return
+              if (
+                Math.hypot(event.clientX - origin.x, event.clientY - origin.y) >
+                SIM_LONG_PRESS_MOVE_CANCEL_PX
+              ) {
+                clearLongPress()
+              }
+            }}
+            onPointerUp={clearLongPress}
+            onPointerCancel={clearLongPress}
+            onContextMenu={(event) => {
+              // Avoid the native callout stealing a long-press meant for simulation.
+              if (brandLongPressEnabled) event.preventDefault()
+            }}
+          >
+            <img src="/rider.svg" alt="" className="h-10 w-14" draggable={false} />
+            <span className="font-display text-2xl font-extrabold uppercase tracking-wide">Event Sync</span>
+          </NavLink>
+
+          {compactPageTitle ? (
+            <span
+              className="min-w-0 truncate font-display text-2xl font-extrabold uppercase tracking-wide text-green-500"
+              aria-current="page"
+            >
+              {' - '}
+              {compactPageTitle}
+            </span>
+          ) : null}
+        </div>
 
         <nav className="flex min-w-0 items-center gap-1" aria-label="Primary">
           {bannerLinks.map((link) => (
