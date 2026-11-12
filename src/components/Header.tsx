@@ -27,8 +27,8 @@ const MENU_NAV_GUARD_MS = 450
 
 const LIVE_PATH = '/live'
 
-/** Matches Tailwind `gap-3` between brand / nav / hamburger. */
-const SECTION_GAP_PX = 12
+/** Matches Tailwind `gap-1.5` between brand / nav / hamburger. */
+const SECTION_GAP_PX = 6
 
 /** Matches Tailwind `gap-1` between banner menu items. */
 const ITEM_GAP_PX = 4
@@ -37,7 +37,7 @@ const ITEM_GAP_PX = 4
 const HAMBURGER_WIDTH_PX = 44
 
 const bannerLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `inline-flex min-h-11 shrink-0 items-center px-3 text-sm font-semibold uppercase tracking-wide ${
+  `inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-semibold uppercase tracking-wide sm:px-3 ${
     isActive ? 'bg-[#f5c518]/20 text-[#f5c518]' : 'text-zinc-300 hover:bg-white/5'
   }`
 
@@ -166,13 +166,13 @@ export function Header() {
     >
       <div
         ref={rowRef}
-        className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-2"
+        className="relative mx-auto flex max-w-6xl items-center gap-1.5 py-2 pl-1.5 pr-2 sm:gap-2 sm:pl-3 sm:pr-4"
       >
         <div className="flex min-w-0 items-center">
           <NavLink
             ref={brandRef}
             to="/"
-            className="flex min-h-11 shrink-0 touch-manipulation items-center gap-2 select-none"
+            className="flex min-h-11 shrink-0 touch-manipulation items-center gap-1 select-none"
             title={
               demoEvent
                 ? 'Go to Home'
@@ -219,12 +219,12 @@ export function Header() {
             }}
           >
             <img src="/rider.svg" alt="" className="h-10 w-14" draggable={false} />
-            <span className="font-display text-2xl font-extrabold uppercase tracking-wide">Event Sync</span>
+            <span className="font-display text-xl font-extrabold uppercase tracking-wide">Event Sync</span>
           </NavLink>
 
           {compactPageTitle ? (
             <span
-              className="min-w-0 truncate font-display text-2xl font-extrabold uppercase tracking-wide text-green-500"
+              className="min-w-0 truncate font-display text-xl font-extrabold uppercase tracking-wide text-green-500"
               aria-current="page"
             >
               {' - '}
@@ -298,7 +298,7 @@ export function Header() {
       </div>
 
       {open && needsHamburger ? (
-        <nav id="site-nav" className="border-t border-white/10 px-4 py-2" aria-label="More">
+        <nav id="site-nav" className="border-t border-white/10 px-2 py-2 sm:px-4" aria-label="More">
           {overflowLinks.map((link) => (
             <NavLink
               key={link.to}
@@ -306,7 +306,7 @@ export function Header() {
               end={link.end}
               title={link.title}
               className={({ isActive }) =>
-                `flex min-h-11 items-center px-3 text-base font-semibold uppercase ${
+                `flex min-h-11 items-center px-2 text-base font-semibold uppercase sm:px-3 ${
                   isActive ? 'bg-[#f5c518]/20 text-[#f5c518]' : ''
                 }`
               }
